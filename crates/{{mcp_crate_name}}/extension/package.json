@@ -1,0 +1,83 @@
+{
+    "name": "{{mcp_crate_name}}",
+    "displayName": "{{vscode_extension_display_name}}",
+    "description": "MCP server for {{project_name}}, callable directly from Copilot Chat.",
+    "version": "0.1.0",
+    "publisher": "{{vscode_publisher}}",
+    "license": "MIT",
+    "author": {
+        "name": "{{author_name}}"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/{{github_owner}}/{{project_name}}.git",
+        "directory": "crates/{{mcp_crate_name}}/extension"
+    },
+    "bugs": {
+        "url": "https://github.com/{{github_owner}}/{{project_name}}/issues"
+    },
+    "homepage": "https://github.com/{{github_owner}}/{{project_name}}/tree/main/crates/{{mcp_crate_name}}",
+    "engines": {
+        "vscode": "^1.101.0"
+    },
+    "categories": [
+        "AI",
+        "Chat",
+        "Other"
+    ],
+    "keywords": [
+        "mcp",
+        "model-context-protocol",
+        "copilot"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "mcpServerDefinitionProviders": [
+            {
+                "id": "{{mcp_crate_name}}",
+                "label": "{{mcp_crate_name}}"
+            }
+        ],
+        "commands": [
+            {
+                "command": "{{mcp_crate_name}}.copyServerPath",
+                "title": "{{mcp_crate_name}}: Copy bundled server binary path",
+                "category": "{{mcp_crate_name}}"
+            },
+            {
+                "command": "{{mcp_crate_name}}.showServerVersion",
+                "title": "{{mcp_crate_name}}: Show bundled server version",
+                "category": "{{mcp_crate_name}}"
+            }
+        ],
+        "configuration": {
+            "title": "{{vscode_extension_display_name}}",
+            "properties": {
+                "{{mcp_crate_name}}.binaryPath": {
+                    "type": "string",
+                    "default": "",
+                    "markdownDescription": "Override the path to the `{{mcp_crate_name}}` binary. Leave blank to use the binary bundled with the extension."
+                },
+                "{{mcp_crate_name}}.extraArgs": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": [],
+                    "markdownDescription": "Extra command-line arguments passed to the `{{mcp_crate_name}}` server on startup."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "compile": "tsc -p ./",
+        "package": "vsce package"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "@types/vscode": "^1.101.0",
+        "typescript": "^5.4.0",
+        "@vscode/vsce": "^3.0.0"
+    }
+}

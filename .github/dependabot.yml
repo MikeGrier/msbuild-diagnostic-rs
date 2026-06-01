@@ -1,0 +1,30 @@
+# Keep GitHub Actions, Cargo, and the VS Code extension's npm deps current.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - rust
+{% if include_vscode_extension %}
+  - package-ecosystem: npm
+    directory: "/crates/{{mcp_crate_name}}/extension"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+{% endif %}

@@ -1,0 +1,227 @@
+# Copyright (c) {{license_year}} {{author_name}}
+name: publish-extension
+
+# Publish per-platform VSIXes for the {{mcp_crate_name}} VS Code extension to the
+# public Marketplace and attach them to a GitHub Release.
+#
+# Trigger:
+#   - Pushing a tag matching `v*` (e.g. `v0.1.3`); created automatically
+#     by release-please when the Release PR is merged.
+#   - `workflow_dispatch` for manual rehearsal.
+#
+# Gating:
+#   - The `publish` job uses `environment: marketplace`. Configure that
+#     environment with a required reviewer and the `VSCE_PAT` secret
+#     (Azure DevOps PAT, Marketplace -> Manage scope).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      pre_release:
+        description: "Publish as a Marketplace pre-release (odd-minor convention)"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  package:
+    name: package (${{ matrix.vscode_target }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - vscode_target: win32-x64
+            rust_target: x86_64-pc-windows-msvc
+          - vscode_target: win32-arm64
+            rust_target: aarch64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain (${{ matrix.rust_target }})
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: publish-${{ matrix.rust_target }}
+
+      - name: cargo build --release {{mcp_crate_name}}
+        run: cargo build --release -p {{mcp_crate_name}} --target ${{ matrix.rust_target }} --locked
+
+      - name: cargo test {{mcp_crate_name}} (host arch only)
+        if: matrix.rust_target == 'x86_64-pc-windows-msvc'
+        run: cargo test -p {{mcp_crate_name}} --target ${{ matrix.rust_target }} --locked
+
+      - name: Read workspace version
+        id: workspace-version
+        uses: ./.github/actions/workspace-version
+
+      - name: Stage binary into extension/bin/
+        shell: pwsh
+        run: |
+          $src = "target/${{ matrix.rust_target }}/release/{{mcp_crate_name}}.exe"
+          $dst = "crates/{{mcp_crate_name}}/extension/bin/{{mcp_crate_name}}.exe"
+          New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
+          Copy-Item $src $dst -Force
+          $ver = "${{ steps.workspace-version.outputs.version }}"
+          $tag = "${{ github.ref_name }}"
+          if ("${{ github.ref_type }}" -eq "tag" -and $tag -like "v*") {
+              $tagVer = $tag.Substring("v".Length)
+              if ($tagVer -ne $ver) {
+                  throw "Tag '$tag' implies version '$tagVer' but Cargo.toml has '$ver'."
+              }
+          }
+          $pkgJson = Get-Content -Raw "crates/{{mcp_crate_name}}/extension/package.json" | ConvertFrom-Json
+          $pkgVer = $pkgJson.version
+          if ($pkgVer -ne $ver) {
+              throw "package.json version '$pkgVer' does not match workspace version '$ver'."
+          }
+          Set-Content -NoNewline -Encoding ascii `
+              -Path crates/{{mcp_crate_name}}/extension/bin/VERSION -Value $ver
+          "Staged {{mcp_crate_name}} $ver for ${{ matrix.vscode_target }}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: npm ci (extension)
+        working-directory: crates/{{mcp_crate_name}}/extension
+        run: npm ci --no-audit --no-fund
+
+      - name: Compile TypeScript
+        working-directory: crates/{{mcp_crate_name}}/extension
+        run: npm run compile
+
+      - name: Compute pre-release flag
+        id: prerelease
+        env:
+          PRE_RELEASE_INPUT: ${{ github.event.inputs.pre_release || 'false' }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pre="false"
+          if [ "${PRE_RELEASE_INPUT:-false}" = "true" ]; then
+              pre="true"
+          elif [ "${REF_TYPE:-}" = "tag" ] && [[ "${REF_NAME}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              minor="${BASH_REMATCH[2]}"
+              if (( minor % 2 == 1 )); then
+                  pre="true"
+              fi
+          fi
+          echo "pre_release=${pre}" >> "$GITHUB_OUTPUT"
+          echo "pre_release=${pre}"
+
+      - name: vsce package --target ${{ matrix.vscode_target }}
+        working-directory: crates/{{mcp_crate_name}}/extension
+        env:
+          PRE_RELEASE: ${{ steps.prerelease.outputs.pre_release }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pre_flag=""
+          if [ "${PRE_RELEASE:-false}" = "true" ]; then
+              pre_flag="--pre-release"
+          fi
+          npx vsce package $pre_flag --target ${{ matrix.vscode_target }} --no-dependencies
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: {{mcp_crate_name}}-${{ matrix.vscode_target }}
+          path: crates/{{mcp_crate_name}}/extension/*.vsix
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish to Marketplace
+    needs: package
+    runs-on: ubuntu-latest
+    environment: marketplace
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Install @vscode/vsce
+        working-directory: crates/{{mcp_crate_name}}/extension
+        run: npm ci --no-audit --no-fund
+
+      - name: Download VSIX artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: vsix
+
+      - name: List VSIXes
+        shell: bash
+        run: |
+          set -euo pipefail
+          find vsix -name '*.vsix' -print
+          test "$(find vsix -name '*.vsix' | wc -l)" -ge 1
+
+      - name: vsce publish (per VSIX)
+        working-directory: crates/{{mcp_crate_name}}/extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          PRE_RELEASE_INPUT: ${{ github.event.inputs.pre_release || 'false' }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${VSCE_PAT:-}" ]; then
+              echo "::error::VSCE_PAT secret is not set on the 'marketplace' environment"
+              exit 1
+          fi
+          pre_flag=""
+          if [ "${PRE_RELEASE_INPUT:-false}" = "true" ]; then
+              pre_flag="--pre-release"
+          elif [ "${REF_TYPE:-}" = "tag" ] && [[ "${REF_NAME}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              minor="${BASH_REMATCH[2]}"
+              if (( minor % 2 == 1 )); then
+                  pre_flag="--pre-release"
+              fi
+          fi
+          shopt -s nullglob
+          published=0
+          for vsix in ../../../vsix/*/*.vsix; do
+              echo "Publishing $vsix"
+              npx vsce publish $pre_flag --packagePath "$vsix" --pat "$VSCE_PAT"
+              published=$((published + 1))
+          done
+          if [ "$published" -eq 0 ]; then
+              echo "::error::No VSIX files found to publish"
+              exit 1
+          fi
+          echo "Published $published VSIX(es)"
+
+      - name: Create GitHub Release with VSIX attachments
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: vsix/*/*.vsix
+          fail_on_unmatched_files: true

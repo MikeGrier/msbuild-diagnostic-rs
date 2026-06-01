@@ -1,0 +1,29 @@
+# Copyright (c) {{license_year}} {{author_name}}
+
+[package]
+name          = "{{mcp_crate_name}}"
+description   = "MCP (Model Context Protocol) server for {{project_name}}."
+readme        = "README.md"
+{% if include_vscode_extension %}exclude       = ["extension/", "tests/"]
+{% else %}exclude       = ["tests/"]
+{% endif %}version.workspace       = true
+authors.workspace       = true
+edition.workspace       = true
+rust-version.workspace  = true
+license.workspace       = true
+repository.workspace    = true
+homepage.workspace      = true
+documentation.workspace = true
+
+[lib]
+name = "{{mcp_crate_name | replace: "-", "_"}}"
+path = "src/lib.rs"
+
+[[bin]]
+name = "{{mcp_crate_name}}"
+path = "src/main.rs"
+
+[dependencies]
+{{core_crate_name}} = { path = "../{{core_crate_name}}", version = "0.1.0" } # x-release-please-version
+serde      = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,101 @@
+# Copyright (c) {{license_year}} {{author_name}}. All rights reserved.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Cancel any in-progress run for the same workflow and PR/push when a newer
+# commit arrives.  PR number is used on pull_request events (unique per PR,
+# fork-safe -- two forks can share a branch name but never the same PR number).
+# On push-to-main and other non-PR events the PR number is absent, so
+# github.run_id is used (unique per run -> no cross-run cancellation).  This
+# ensures that when the release-please `update-lockfile` job pushes a
+# Cargo.lock fix commit to the Release PR branch, the earlier
+# (stale-lockfile) run is cancelled and only the fresh run proceeds.
+concurrency:
+  group: ${{ github.repository }}-${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+# Opt every JavaScript-action step into the Node.js 24 runtime ahead of
+# GitHub's June 2, 2026 forced cutover. Surfaces any action-vs-runtime
+# incompatibilities under our control rather than discovering them on the
+# day GitHub flips the default.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  encoding:
+    name: encoding sanity check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run check-encoding.ps1
+        shell: pwsh
+        run: ./tools/check-encoding.ps1
+
+  build-test:
+    name: build + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # `--locked` makes CI fail if Cargo would need to update Cargo.lock.
+      # CI must build the exact dependency graph that was committed; any
+      # version drift should happen in a developer's local edit, not silently
+      # in CI. (We deliberately do not use `--frozen`, which additionally
+      # forbids network access and would break the initial registry fetch on
+      # a cold cache.)
+      - name: cargo build
+        run: cargo build --workspace --all-targets --locked
+      # Backtraces + --no-fail-fast make intermittent test failures actionable.
+      # RUST_LIB_BACKTRACE is what libtest's own panic capture reads (without
+      # it some panics still print "note: run with `RUST_BACKTRACE=1` ..."),
+      # and --no-fail-fast ensures one failing crate doesn't mask backtraces
+      # from later test binaries in the workspace.
+      - name: cargo test
+        env:
+          RUST_BACKTRACE: 1
+          RUST_LIB_BACKTRACE: 1
+        run: cargo test --workspace --locked --no-fail-fast
+
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  msrv:
+    name: MSRV check (1.85)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # Pin to the exact MSRV declared in [workspace.package].rust-version
+      # so a stray use of a newer-stable feature fails CI rather than
+      # silently raising the floor for downstream consumers.
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check (MSRV)
+        run: cargo check --workspace --all-targets --locked

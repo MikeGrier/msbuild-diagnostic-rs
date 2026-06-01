@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build helloworld",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/testprojects/csharp/helloworld/helloworld.csproj",
+        "-bl:${workspaceFolder}/testprojects/csharp/helloworld/msbuild.binlog"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    }
+  ]
+}

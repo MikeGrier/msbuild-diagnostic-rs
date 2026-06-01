@@ -1,0 +1,36 @@
+{
+    "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+    "release-type": "simple",
+    "include-component-in-tag": false,
+    "packages": {
+        ".": {
+            "package-name": "{{project_name}}",
+            "extra-files": [
+                "Cargo.toml"{% if include_vscode_extension %},
+                {
+                    "type": "generic",
+                    "path": "crates/{{mcp_crate_name}}/Cargo.toml"
+                },
+                {
+                    "type": "json",
+                    "path": "crates/{{mcp_crate_name}}/extension/package.json",
+                    "jsonpath": "$.version"
+                },
+                {
+                    "type": "json",
+                    "path": "crates/{{mcp_crate_name}}/extension/package-lock.json",
+                    "jsonpath": "$.version"
+                },
+                {
+                    "type": "json",
+                    "path": "crates/{{mcp_crate_name}}/extension/package-lock.json",
+                    "jsonpath": "$.packages[''].version"
+                }{% elsif include_mcp %},
+                {
+                    "type": "generic",
+                    "path": "crates/{{mcp_crate_name}}/Cargo.toml"
+                }{% endif %}
+            ]
+        }
+    }
+}

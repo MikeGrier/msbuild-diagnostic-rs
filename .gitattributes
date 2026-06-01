@@ -1,0 +1,20 @@
+# Normalize line endings: Git stores LF, checks out platform-native by default.
+* text=auto eol=lf
+
+# Windows-only scripts must keep CRLF on disk.
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+*.psd1  text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+
+# Treat known binary formats as binary so Git never tries to munge them.
+*.binlog binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.vsix   binary
+*.zip    binary
+*.gz     binary

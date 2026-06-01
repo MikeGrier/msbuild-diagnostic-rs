@@ -1,0 +1,18 @@
+# Copyright (c) {{license_year}} {{author_name}}
+
+[package]
+name          = "{{core_crate_name}}"
+description   = "{{project_description}}"
+readme        = "README.md"
+version.workspace       = true
+authors.workspace       = true
+edition.workspace       = true
+rust-version.workspace  = true
+license.workspace       = true
+repository.workspace    = true
+homepage.workspace      = true
+documentation.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
