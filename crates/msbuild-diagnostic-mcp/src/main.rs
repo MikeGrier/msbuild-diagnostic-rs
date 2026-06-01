@@ -1,6 +1,6 @@
-// Copyright (c) {{license_year}} {{author_name}}
+// Copyright (c) 2026 Mike Grier
 
-//! `{{mcp_crate_name}}` — minimal MCP server skeleton.
+//! `msbuild-diagnostic-mcp` — minimal MCP server skeleton.
 //!
 //! Speaks JSON-RPC 2.0 over stdio with newline-delimited messages. Supports
 //! the four methods every MCP client expects on startup: `initialize`,
@@ -14,7 +14,7 @@ use std::io::{self, BufRead, Write};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use {{mcp_crate_name | replace: "-", "_"}}::tools;
+use msbuild_diagnostic_mcp::tools;
 
 #[derive(Deserialize)]
 struct Message {
@@ -99,7 +99,7 @@ fn handle_line(line: &str) -> Option<Response> {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": { "tools": {} },
             "serverInfo": {
-                "name": "{{mcp_crate_name}}",
+                "name": "msbuild-diagnostic-mcp",
                 "version": env!("CARGO_PKG_VERSION")
             }
         })),

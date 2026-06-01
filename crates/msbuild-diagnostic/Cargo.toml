@@ -1,8 +1,8 @@
-# Copyright (c) {{license_year}} {{author_name}}
+# Copyright (c) 2026 Mike Grier
 
 [package]
-name          = "{{core_crate_name}}"
-description   = "{{project_description}}"
+name          = "msbuild-diagnostic"
+description   = "Tools to help work with msbuild based project builds to diagnose and correct bad behaviors"
 readme        = "README.md"
 version.workspace       = true
 authors.workspace       = true

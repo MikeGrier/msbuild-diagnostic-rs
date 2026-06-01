@@ -1,4 +1,4 @@
-# GitHub Copilot Instructions — {{project_name}}
+# GitHub Copilot Instructions — msbuild-diagnostic-rs
 
 ## Cargo commands — use MCP tools, never the terminal
 
@@ -29,6 +29,8 @@ terminal for cargo just because a previous step used the terminal.
 | `cargo_add` | `cargo add` |
 | `cargo_remove` | `cargo remove` |
 | `cargo_publish` | `cargo publish` |
+| `cargo_setup` | *(no terminal equivalent)* |
+| `cargo_diagnostic` | *(no terminal equivalent)* |
 
 ### When to use each tool
 

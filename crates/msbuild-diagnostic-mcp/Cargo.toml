@@ -1,0 +1,28 @@
+# Copyright (c) 2026 Mike Grier
+
+[package]
+name          = "msbuild-diagnostic-mcp"
+description   = "MCP (Model Context Protocol) server for msbuild-diagnostic-rs."
+readme        = "README.md"
+exclude       = ["extension/", "tests/"]
+version.workspace       = true
+authors.workspace       = true
+edition.workspace       = true
+rust-version.workspace  = true
+license.workspace       = true
+repository.workspace    = true
+homepage.workspace      = true
+documentation.workspace = true
+
+[lib]
+name = "msbuild_diagnostic_mcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "msbuild-diagnostic-mcp"
+path = "src/main.rs"
+
+[dependencies]
+msbuild-diagnostic = { path = "../msbuild-diagnostic", version = "0.1.0" } # x-release-please-version
+serde      = { workspace = true }
+serde_json = { workspace = true }

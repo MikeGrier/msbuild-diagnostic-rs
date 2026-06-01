@@ -1,8 +1,8 @@
-// Copyright (c) {{license_year}} {{author_name}}.
+// Copyright (c) 2026 Mike Grier.
 //
-// {{mcp_crate_name}} VS Code extension entry point.
+// msbuild-diagnostic-mcp VS Code extension entry point.
 //
-// Registers the bundled `{{mcp_crate_name}}` binary as an MCP server so that
+// Registers the bundled `msbuild-diagnostic-mcp` binary as an MCP server so that
 // Copilot Chat (and any other VS Code MCP consumer) discovers it automatically
 // with no `.vscode/mcp.json` editing required.
 
@@ -10,10 +10,10 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 
-const PROVIDER_ID = "{{mcp_crate_name}}";
-const SERVER_LABEL = "{{mcp_crate_name}}";
-const CONFIG_SECTION = "{{mcp_crate_name}}";
-const BINARY_BASENAME = "{{mcp_crate_name}}";
+const PROVIDER_ID = "msbuild-diagnostic-mcp";
+const SERVER_LABEL = "msbuild-diagnostic-mcp";
+const CONFIG_SECTION = "msbuild-diagnostic-mcp";
+const BINARY_BASENAME = "msbuild-diagnostic-mcp";
 
 function resolveBinaryPath(context: vscode.ExtensionContext): string | undefined {
     const config = vscode.workspace.getConfiguration(CONFIG_SECTION);

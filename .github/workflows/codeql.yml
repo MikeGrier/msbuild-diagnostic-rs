@@ -24,9 +24,9 @@ jobs:
         include:
         - language: actions
           build-mode: none
-{% if include_vscode_extension %}        - language: javascript-typescript
+        - language: javascript-typescript
           build-mode: none
-{% endif %}        - language: rust
+        - language: rust
           build-mode: none
 
     steps:

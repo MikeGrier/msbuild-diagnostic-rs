@@ -1,4 +1,4 @@
-# Copyright (c) {{license_year}} {{author_name}}
+# Copyright (c) 2026 Mike Grier
 name: release-please
 
 # Creates or updates a "Release PR" on every push to main.
@@ -13,9 +13,9 @@ name: release-please
 #
 # What the Release PR updates automatically:
 #   - [workspace.package].version in Cargo.toml
-#   - Cargo.lock (updated by the `update-lockfile` job below){% if include_vscode_extension %}
-#   - version in crates/{{mcp_crate_name}}/extension/package.json
-#   - version in crates/{{mcp_crate_name}}/extension/package-lock.json (root + packages[""]){% endif %}
+#   - Cargo.lock (updated by the `update-lockfile` job below)
+#   - version in crates/msbuild-diagnostic-mcp/extension/package.json
+#   - version in crates/msbuild-diagnostic-mcp/extension/package-lock.json (root + packages[""])
 #   - CHANGELOG.md
 #
 # After merging the Release PR the tag v{version} is created.

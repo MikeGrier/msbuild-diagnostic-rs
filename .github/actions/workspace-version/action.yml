@@ -1,4 +1,4 @@
-# Copyright (c) {{license_year}} {{author_name}}
+# Copyright (c) 2026 Mike Grier
 name: Read workspace version
 description: >
   Reads [workspace.package].version from the root Cargo.toml (the single

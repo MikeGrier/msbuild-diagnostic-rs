@@ -1,0 +1,83 @@
+{
+    "name": "msbuild-diagnostic-mcp",
+    "displayName": "MSBuild Diagnostic MCP",
+    "description": "MCP server for msbuild-diagnostic-rs, callable directly from Copilot Chat.",
+    "version": "0.1.0",
+    "publisher": "MikeGrier",
+    "license": "MIT",
+    "author": {
+        "name": "Mike Grier"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/MikeGrier/msbuild-diagnostic-rs.git",
+        "directory": "crates/msbuild-diagnostic-mcp/extension"
+    },
+    "bugs": {
+        "url": "https://github.com/MikeGrier/msbuild-diagnostic-rs/issues"
+    },
+    "homepage": "https://github.com/MikeGrier/msbuild-diagnostic-rs/tree/main/crates/msbuild-diagnostic-mcp",
+    "engines": {
+        "vscode": "^1.101.0"
+    },
+    "categories": [
+        "AI",
+        "Chat",
+        "Other"
+    ],
+    "keywords": [
+        "mcp",
+        "model-context-protocol",
+        "copilot"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "mcpServerDefinitionProviders": [
+            {
+                "id": "msbuild-diagnostic-mcp",
+                "label": "msbuild-diagnostic-mcp"
+            }
+        ],
+        "commands": [
+            {
+                "command": "msbuild-diagnostic-mcp.copyServerPath",
+                "title": "msbuild-diagnostic-mcp: Copy bundled server binary path",
+                "category": "msbuild-diagnostic-mcp"
+            },
+            {
+                "command": "msbuild-diagnostic-mcp.showServerVersion",
+                "title": "msbuild-diagnostic-mcp: Show bundled server version",
+                "category": "msbuild-diagnostic-mcp"
+            }
+        ],
+        "configuration": {
+            "title": "MSBuild Diagnostic MCP",
+            "properties": {
+                "msbuild-diagnostic-mcp.binaryPath": {
+                    "type": "string",
+                    "default": "",
+                    "markdownDescription": "Override the path to the `msbuild-diagnostic-mcp` binary. Leave blank to use the binary bundled with the extension."
+                },
+                "msbuild-diagnostic-mcp.extraArgs": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": [],
+                    "markdownDescription": "Extra command-line arguments passed to the `msbuild-diagnostic-mcp` server on startup."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "compile": "tsc -p ./",
+        "package": "vsce package"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "@types/vscode": "^1.101.0",
+        "typescript": "^5.4.0",
+        "@vscode/vsce": "^3.0.0"
+    }
+}

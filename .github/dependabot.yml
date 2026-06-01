@@ -18,13 +18,13 @@ updates:
     labels:
       - dependencies
       - rust
-{% if include_vscode_extension %}
+
   - package-ecosystem: npm
-    directory: "/crates/{{mcp_crate_name}}/extension"
+    directory: "/crates/msbuild-diagnostic-mcp/extension"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
     labels:
       - dependencies
       - npm
-{% endif %}
+

@@ -3,6 +3,6 @@
 node_modules/
 out/
 bin/*.exe
-bin/{{mcp_crate_name}}
+bin/msbuild-diagnostic-mcp
 bin/VERSION
 *.vsix

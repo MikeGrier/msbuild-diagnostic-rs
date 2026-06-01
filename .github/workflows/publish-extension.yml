@@ -1,7 +1,7 @@
-# Copyright (c) {{license_year}} {{author_name}}
+# Copyright (c) 2026 Mike Grier
 name: publish-extension
 
-# Publish per-platform VSIXes for the {{mcp_crate_name}} VS Code extension to the
+# Publish per-platform VSIXes for the msbuild-diagnostic-mcp VS Code extension to the
 # public Marketplace and attach them to a GitHub Release.
 #
 # Trigger:
@@ -59,12 +59,12 @@ jobs:
         with:
           key: publish-${{ matrix.rust_target }}
 
-      - name: cargo build --release {{mcp_crate_name}}
-        run: cargo build --release -p {{mcp_crate_name}} --target ${{ matrix.rust_target }} --locked
+      - name: cargo build --release msbuild-diagnostic-mcp
+        run: cargo build --release -p msbuild-diagnostic-mcp --target ${{ matrix.rust_target }} --locked
 
-      - name: cargo test {{mcp_crate_name}} (host arch only)
+      - name: cargo test msbuild-diagnostic-mcp (host arch only)
         if: matrix.rust_target == 'x86_64-pc-windows-msvc'
-        run: cargo test -p {{mcp_crate_name}} --target ${{ matrix.rust_target }} --locked
+        run: cargo test -p msbuild-diagnostic-mcp --target ${{ matrix.rust_target }} --locked
 
       - name: Read workspace version
         id: workspace-version
@@ -73,8 +73,8 @@ jobs:
       - name: Stage binary into extension/bin/
         shell: pwsh
         run: |
-          $src = "target/${{ matrix.rust_target }}/release/{{mcp_crate_name}}.exe"
-          $dst = "crates/{{mcp_crate_name}}/extension/bin/{{mcp_crate_name}}.exe"
+          $src = "target/${{ matrix.rust_target }}/release/msbuild-diagnostic-mcp.exe"
+          $dst = "crates/msbuild-diagnostic-mcp/extension/bin/msbuild-diagnostic-mcp.exe"
           New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
           Copy-Item $src $dst -Force
           $ver = "${{ steps.workspace-version.outputs.version }}"
@@ -85,14 +85,14 @@ jobs:
                   throw "Tag '$tag' implies version '$tagVer' but Cargo.toml has '$ver'."
               }
           }
-          $pkgJson = Get-Content -Raw "crates/{{mcp_crate_name}}/extension/package.json" | ConvertFrom-Json
+          $pkgJson = Get-Content -Raw "crates/msbuild-diagnostic-mcp/extension/package.json" | ConvertFrom-Json
           $pkgVer = $pkgJson.version
           if ($pkgVer -ne $ver) {
               throw "package.json version '$pkgVer' does not match workspace version '$ver'."
           }
           Set-Content -NoNewline -Encoding ascii `
-              -Path crates/{{mcp_crate_name}}/extension/bin/VERSION -Value $ver
-          "Staged {{mcp_crate_name}} $ver for ${{ matrix.vscode_target }}"
+              -Path crates/msbuild-diagnostic-mcp/extension/bin/VERSION -Value $ver
+          "Staged msbuild-diagnostic-mcp $ver for ${{ matrix.vscode_target }}"
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -100,11 +100,11 @@ jobs:
           node-version: "22"
 
       - name: npm ci (extension)
-        working-directory: crates/{{mcp_crate_name}}/extension
+        working-directory: crates/msbuild-diagnostic-mcp/extension
         run: npm ci --no-audit --no-fund
 
       - name: Compile TypeScript
-        working-directory: crates/{{mcp_crate_name}}/extension
+        working-directory: crates/msbuild-diagnostic-mcp/extension
         run: npm run compile
 
       - name: Compute pre-release flag
@@ -129,7 +129,7 @@ jobs:
           echo "pre_release=${pre}"
 
       - name: vsce package --target ${{ matrix.vscode_target }}
-        working-directory: crates/{{mcp_crate_name}}/extension
+        working-directory: crates/msbuild-diagnostic-mcp/extension
         env:
           PRE_RELEASE: ${{ steps.prerelease.outputs.pre_release }}
         shell: bash
@@ -144,8 +144,8 @@ jobs:
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v5
         with:
-          name: {{mcp_crate_name}}-${{ matrix.vscode_target }}
-          path: crates/{{mcp_crate_name}}/extension/*.vsix
+          name: msbuild-diagnostic-mcp-${{ matrix.vscode_target }}
+          path: crates/msbuild-diagnostic-mcp/extension/*.vsix
           if-no-files-found: error
           retention-days: 7
 
@@ -165,7 +165,7 @@ jobs:
           node-version: "22"
 
       - name: Install @vscode/vsce
-        working-directory: crates/{{mcp_crate_name}}/extension
+        working-directory: crates/msbuild-diagnostic-mcp/extension
         run: npm ci --no-audit --no-fund
 
       - name: Download VSIX artifacts
@@ -181,7 +181,7 @@ jobs:
           test "$(find vsix -name '*.vsix' | wc -l)" -ge 1
 
       - name: vsce publish (per VSIX)
-        working-directory: crates/{{mcp_crate_name}}/extension
+        working-directory: crates/msbuild-diagnostic-mcp/extension
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
           PRE_RELEASE_INPUT: ${{ github.event.inputs.pre_release || 'false' }}

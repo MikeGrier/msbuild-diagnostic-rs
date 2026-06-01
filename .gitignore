@@ -12,9 +12,9 @@ target
 **/mutants.out*/
 
 # VS Code extension build artefacts
-crates/{{mcp_crate_name}}/extension/node_modules/
-crates/{{mcp_crate_name}}/extension/out/
-crates/{{mcp_crate_name}}/extension/bin/*.exe
-crates/{{mcp_crate_name}}/extension/bin/{{mcp_crate_name}}
-crates/{{mcp_crate_name}}/extension/bin/VERSION
-crates/{{mcp_crate_name}}/extension/*.vsix
+crates/msbuild-diagnostic-mcp/extension/node_modules/
+crates/msbuild-diagnostic-mcp/extension/out/
+crates/msbuild-diagnostic-mcp/extension/bin/*.exe
+crates/msbuild-diagnostic-mcp/extension/bin/msbuild-diagnostic-mcp
+crates/msbuild-diagnostic-mcp/extension/bin/VERSION
+crates/msbuild-diagnostic-mcp/extension/*.vsix

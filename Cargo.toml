@@ -1,21 +1,21 @@
-# Copyright (c) {{license_year}} {{author_name}}
+# Copyright (c) 2026 Mike Grier
 
 [workspace]
 members = [
-    "crates/{{core_crate_name}}",
-{% if include_mcp %}    "crates/{{mcp_crate_name}}",
-{% endif %}]
+    "crates/msbuild-diagnostic",
+    "crates/msbuild-diagnostic-mcp",
+]
 resolver = "2"
 
 [workspace.package]
 version       = "0.1.0" # x-release-please-version
-authors       = ["{{author_name}}"]
+authors       = ["Mike Grier"]
 edition       = "2021"
 rust-version  = "1.85"
 license       = "MIT"
-repository    = "https://github.com/{{github_owner}}/{{project_name}}"
-homepage      = "https://github.com/{{github_owner}}/{{project_name}}"
-documentation = "https://docs.rs/{{core_crate_name}}"
+repository    = "https://github.com/MikeGrier/msbuild-diagnostic-rs"
+homepage      = "https://github.com/MikeGrier/msbuild-diagnostic-rs"
+documentation = "https://docs.rs/msbuild-diagnostic"
 
 [workspace.dependencies]
 serde      = { version = "1", features = ["derive"] }

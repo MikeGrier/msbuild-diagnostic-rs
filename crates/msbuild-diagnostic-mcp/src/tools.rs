@@ -1,4 +1,4 @@
-// Copyright (c) {{license_year}} {{author_name}}
+// Copyright (c) 2026 Mike Grier
 
 //! Minimal MCP (Model Context Protocol) tool module.
 //!
@@ -12,7 +12,7 @@ pub fn call(name: &str, _arguments: &Value) -> Result<Value, String> {
     match name {
         "hello" => Ok(json!({
             "content": [
-                { "type": "text", "text": "Hello from {{mcp_crate_name}}!" }
+                { "type": "text", "text": "Hello from msbuild-diagnostic-mcp!" }
             ]
         })),
         other => Err(format!("unknown tool: {other}")),

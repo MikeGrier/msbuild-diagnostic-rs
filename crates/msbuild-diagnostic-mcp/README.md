@@ -1,7 +1,7 @@
-<!-- Copyright (c) {{license_year}} {{author_name}} -->
-# {{mcp_crate_name}}
+<!-- Copyright (c) 2026 Mike Grier -->
+# msbuild-diagnostic-mcp
 
-MCP (Model Context Protocol) server for `{{project_name}}`.
+MCP (Model Context Protocol) server for `msbuild-diagnostic-rs`.
 Communicates over JSON-RPC 2.0 on stdio.
 
 ## Tools
@@ -13,10 +13,10 @@ Communicates over JSON-RPC 2.0 on stdio.
 ## Build
 
 ```powershell
-cargo build --release -p {{mcp_crate_name}}
+cargo build --release -p msbuild-diagnostic-mcp
 ```
 
-The binary is produced at `target/release/{{mcp_crate_name}}.exe`.
+The binary is produced at `target/release/msbuild-diagnostic-mcp.exe`.
 
 ## VS Code configuration
 
@@ -25,16 +25,16 @@ Add to `.vscode/mcp.json`:
 ```json
 {
     "servers": {
-        "{{mcp_crate_name}}": {
+        "msbuild-diagnostic-mcp": {
             "type": "stdio",
-            "command": "${workspaceFolder}/target/release/{{mcp_crate_name}}.exe",
+            "command": "${workspaceFolder}/target/release/msbuild-diagnostic-mcp.exe",
             "args": []
         }
     }
 }
 ```
-{% if include_vscode_extension %}
+
 The easier path for end users is the bundled VS Code extension under
 [`extension/`](extension), which auto-registers this server with no
 `mcp.json` editing required.
-{% endif %}
+
