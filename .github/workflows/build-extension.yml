@@ -56,6 +56,15 @@ jobs:
         with:
           targets: ${{ matrix.rust_target }}
 
+      # `rust-toolchain.toml` pins the active toolchain to a specific
+      # version, which overrides the `stable` toolchain installed above.
+      # dtolnay's action adds the matrix target to `stable`, not to the
+      # pinned toolchain, so explicitly add it to the toolchain that will
+      # actually run the build. Without this, cross-compiling to a target
+      # whose std isn't already installed fails with E0463.
+      - name: Add target to pinned toolchain
+        run: rustup target add ${{ matrix.rust_target }}
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
