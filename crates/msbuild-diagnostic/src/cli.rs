@@ -43,6 +43,8 @@ pub enum Command {
     Archive(ArchiveArgs),
     /// Diff two snapshot archives' `tree.json` payloads (AR-13).
     Diff(DiffArgs),
+    /// Sanitize a capture archive into a shareable counterpart (AR-18).
+    Sanitize(SanitizeArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -103,11 +105,27 @@ pub struct DiffArgs {
     pub markdown: Option<PathBuf>,
 }
 
+#[derive(Debug, clap::Args)]
+pub struct SanitizeArgs {
+    /// Capture archive to sanitize.
+    pub input: PathBuf,
+    /// Output path for the sanitized zip. Defaults to
+    /// `<input-stem>-sanitized.zip` next to the input.
+    #[arg(long)]
+    pub out: Option<PathBuf>,
+    /// Output path for the local-only pseudonym map JSON. Defaults to
+    /// `<input-stem>-pseudonym-map.local.json` next to the input.
+    /// **Never** written inside the sanitized zip.
+    #[arg(long = "map")]
+    pub map: Option<PathBuf>,
+}
+
 /// Dispatch a parsed CLI command. Writes human-readable output to `out`.
 pub fn run<W: Write>(cli: Cli, out: &mut W) -> std::io::Result<()> {
     match cli.command {
         Command::Archive(args) => archive_run(&args, out),
         Command::Diff(args) => diff_run(&args, out),
+        Command::Sanitize(args) => sanitize_run(&args, out),
     }
 }
 
@@ -285,6 +303,30 @@ fn diff_run<W: Write>(args: &DiffArgs, out: &mut W) -> std::io::Result<()> {
         )?;
     }
 
+    Ok(())
+}
+
+fn sanitize_run<W: Write>(args: &SanitizeArgs, out: &mut W) -> std::io::Result<()> {
+    let (default_zip, default_map) = crate::sanitize::pipeline::default_output_paths(&args.input);
+    let output = args.out.clone().unwrap_or(default_zip);
+    let map = args.map.clone().unwrap_or(default_map);
+    let pseudonymizer = crate::sanitize::pseudonym::Pseudonymizer::from_environment();
+    let report =
+        crate::sanitize::pipeline::sanitize_archive(&crate::sanitize::pipeline::SanitizeInputs {
+            input: &args.input,
+            output: &output,
+            map: &map,
+            pseudonymizer: &pseudonymizer,
+        })?;
+    let unknown = report.unknown_artifacts.len();
+    writeln!(
+        out,
+        "wrote {} (entries={}, unknown_artifacts={})",
+        output.display(),
+        report.entries.len(),
+        unknown
+    )?;
+    writeln!(out, "wrote {} (pseudonym map; KEEP LOCAL)", map.display())?;
     Ok(())
 }
 

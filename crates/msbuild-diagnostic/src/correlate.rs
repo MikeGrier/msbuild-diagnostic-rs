@@ -534,7 +534,12 @@ mod tests {
             }],
         };
         let mut buf = Vec::new();
-        write_markdown_report(&report, &mut buf, &crate::sanitize::pseudonym::Pseudonymizer::noop()).unwrap();
+        write_markdown_report(
+            &report,
+            &mut buf,
+            &crate::sanitize::pseudonym::Pseudonymizer::noop(),
+        )
+        .unwrap();
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains("# Incremental build correlation report"));
         assert!(s.contains("Compile"));
@@ -549,7 +554,12 @@ mod tests {
             findings: Vec::new(),
         };
         let mut buf = Vec::new();
-        write_markdown_report(&report, &mut buf, &crate::sanitize::pseudonym::Pseudonymizer::noop()).unwrap();
+        write_markdown_report(
+            &report,
+            &mut buf,
+            &crate::sanitize::pseudonym::Pseudonymizer::noop(),
+        )
+        .unwrap();
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains("No `is newer than`"));
     }
@@ -605,9 +615,18 @@ mod tests {
             !s.contains(profile),
             "raw user-profile prefix leaked into report:\n{s}"
         );
-        assert!(s.contains("<USER>/proj/src/a.cs"), "missing pseudonymized input path:\n{s}");
-        assert!(s.contains("<USER>/proj/bin/a.dll"), "missing pseudonymized output path:\n{s}");
-        assert!(s.contains("<USER>/proj/p.csproj"), "missing pseudonymized project file:\n{s}");
+        assert!(
+            s.contains("<USER>/proj/src/a.cs"),
+            "missing pseudonymized input path:\n{s}"
+        );
+        assert!(
+            s.contains("<USER>/proj/bin/a.dll"),
+            "missing pseudonymized output path:\n{s}"
+        );
+        assert!(
+            s.contains("<USER>/proj/p.csproj"),
+            "missing pseudonymized project file:\n{s}"
+        );
     }
 
     #[test]

@@ -2,5 +2,6 @@
 //! registry. Higher-level sanitize/redact entry points land in later
 //! milestones; M1 ships only the rule skeleton.
 
+pub mod pipeline;
 pub mod pseudonym;
 pub mod rules;

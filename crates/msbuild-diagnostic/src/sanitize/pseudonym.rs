@@ -82,7 +82,10 @@ mod tests {
     #[test]
     fn noop_pseudonymizer_returns_input_verbatim() {
         let p = Pseudonymizer::noop();
-        assert_eq!(p.rewrite("C:\\Users\\alice\\src\\a.cs"), "C:\\Users\\alice\\src\\a.cs");
+        assert_eq!(
+            p.rewrite("C:\\Users\\alice\\src\\a.cs"),
+            "C:\\Users\\alice\\src\\a.cs"
+        );
     }
 
     #[test]

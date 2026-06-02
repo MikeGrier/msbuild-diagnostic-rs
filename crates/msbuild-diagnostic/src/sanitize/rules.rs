@@ -191,7 +191,11 @@ pub const M3_FIELD_RULES: &[FieldRule] = &[
     // diff-report.json — describes a tree-snapshot pair. Path-bearing
     // fields use the same pseudonym rule as `tree.json`; per-entry
     // value fields (size / mtime / sha256) are inherently safe.
-    field("diff-report.json", "schema_version", Classification::Verbatim),
+    field(
+        "diff-report.json",
+        "schema_version",
+        Classification::Verbatim,
+    ),
     field(
         "diff-report.json",
         "roots.root",

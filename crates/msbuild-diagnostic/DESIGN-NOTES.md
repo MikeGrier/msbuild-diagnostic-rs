@@ -326,3 +326,26 @@ in-memory field block. The assertions remain spec-required: the diff
 report identifies a touched-but-content-identical input. The test runs
 without external toolchains and exercises the full `diff --binlog
 --markdown` pipeline on real archive zips on disk.
+## D-17 (M4): Sanitizer scopes binlog binary stream out
+
+AR-18 introduces the `sanitize` subcommand. The captured `.binlog` file
+is the only artifact in a capture archive whose payload is a binary
+record stream (Microsoft.Build's BuildEventArgs serializer). Rewriting
+those records to redact property values and environment variables
+requires a writer that produces the same binary records as the
+original — a substantial undertaking that depends on munin's writer
+exposing the right surface and on a stable mapping from event types to
+redaction policy.
+
+For M4, the sanitizer **drops the binlog from the sanitized zip** and
+records the drop in `sanitization-report.json` with an explicit reason.
+Text-bearing artifacts (`imports/*`, `tlogs/*`) carry enough of the
+build's behavior — combined with the diff and correlation reports — to
+diagnose the incremental-build issues this tool exists to address.
+
+The property-value redaction policy in M4 therefore applies to
+**text artifacts only**: `imports/*` XML property bodies are flattened
+to `<REDACTED-PROPERTY>` via a forward XML scan that excludes
+structural elements (`Project`, `PropertyGroup`, `ItemGroup`, etc.).
+Binary binlog redaction is deferred and will be revisited if and when
+the binlog payload is reinstated in the sanitized archive.
