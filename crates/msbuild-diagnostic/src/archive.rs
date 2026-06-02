@@ -11,6 +11,7 @@ use std::io::{Read, Seek, Write};
 use zip::write::{SimpleFileOptions, ZipWriter};
 use zip::CompressionMethod;
 
+use crate::manifest::{Manifest, MANIFEST_NAME};
 use crate::snapshot::TreeSnapshot;
 
 /// Canonical name for the file-tree snapshot inside the archive.
@@ -19,14 +20,16 @@ pub const TREE_JSON_NAME: &str = "tree.json";
 /// Canonical name for the imports subdirectory inside the archive (D-3).
 pub const IMPORTS_DIR_NAME: &str = "imports/";
 
-/// Inputs to a single archive write. Additional fields (manifest, tlogs,
-/// extracted imports) will land here in subsequent checklist items.
+/// Inputs to a single archive write. Additional fields (tlogs, extracted
+/// imports) will land here in subsequent checklist items.
 pub struct ArchiveInputs<'a> {
     /// Name to store the binlog under inside the archive (typically the
     /// binlog's original filename).
     pub binlog_name: &'a str,
     /// File-tree snapshot to serialize as `tree.json`.
     pub tree: &'a TreeSnapshot,
+    /// Capture manifest to serialize as `manifest.json`.
+    pub manifest: &'a Manifest,
 }
 
 /// Write the archive to `out`. `out` must be seekable (the central
@@ -56,6 +59,9 @@ pub fn write_archive<W: Write + Seek, R: Read>(
         .map_err(zip_to_io)?;
     serde_json::to_writer_pretty(&mut zw, inputs.tree)?;
 
+    zw.start_file(MANIFEST_NAME, file_opts).map_err(zip_to_io)?;
+    serde_json::to_writer_pretty(&mut zw, inputs.manifest)?;
+
     zw.finish().map_err(zip_to_io)?;
     Ok(())
 }
@@ -70,6 +76,7 @@ mod tests {
     //! `Cursor<Vec<u8>>` and the verification reader is also in-memory; no
     //! filesystem access.
     use super::*;
+    use crate::manifest::{build_manifest, CaptureEnvironment, ManifestInputs};
     use crate::snapshot::{EntryKind, RootSnapshot, TimestampNs, TreeEntry, TREE_SCHEMA_VERSION};
     use std::io::Cursor;
     use std::path::PathBuf;
@@ -91,11 +98,29 @@ mod tests {
         }
     }
 
+    fn sample_manifest() -> Manifest {
+        let env = CaptureEnvironment {
+            machine: "HOST".into(),
+            os: "linux".into(),
+            arch: "x86_64".into(),
+        };
+        build_manifest(ManifestInputs {
+            captured_at: TimestampNs(1_700_000_000_000_000_000),
+            env: &env,
+            roots: &[PathBuf::from("src")],
+            binlog_archive_name: "build.binlog",
+            kind: "T1",
+            pair_id: None,
+        })
+    }
+
     fn build(binlog_bytes: &[u8]) -> Vec<u8> {
         let tree = sample_tree();
+        let manifest = sample_manifest();
         let inputs = ArchiveInputs {
             binlog_name: "build.binlog",
             tree: &tree,
+            manifest: &manifest,
         };
         let mut buf = Cursor::new(Vec::<u8>::new());
         write_archive(&inputs, Cursor::new(binlog_bytes), &mut buf).expect("write");
@@ -136,6 +161,17 @@ mod tests {
         f.read_to_string(&mut buf).expect("read");
         let back: TreeSnapshot = serde_json::from_str(&buf).expect("parse");
         assert_eq!(back, sample_tree());
+    }
+
+    #[test]
+    fn manifest_round_trips_through_archive() {
+        let zip_bytes = build(b"x");
+        let mut archive = open(zip_bytes);
+        let mut f = archive.by_name(MANIFEST_NAME).expect("manifest.json");
+        let mut buf = String::new();
+        f.read_to_string(&mut buf).expect("read");
+        let back: Manifest = serde_json::from_str(&buf).expect("parse");
+        assert_eq!(back, sample_manifest());
     }
 
     #[test]

@@ -6,6 +6,7 @@
 
 pub mod archive;
 pub mod cli;
+pub mod manifest;
 pub mod snapshot;
 
 /// Returns a hello-world greeting from this crate.

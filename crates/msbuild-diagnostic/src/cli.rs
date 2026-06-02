@@ -11,6 +11,12 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+use crate::archive::{write_archive, ArchiveInputs};
+use crate::manifest::{
+    build_manifest, compose_archive_filename, CaptureEnvironment, ManifestInputs,
+};
+use crate::snapshot::{snapshot_roots, TimestampNs};
+
 /// Default SHA-256 size threshold for `tree.json` entries, in bytes (D-4).
 pub const DEFAULT_SMALL_FILE_HASH_THRESHOLD: u64 = 1_048_576;
 
@@ -62,31 +68,67 @@ pub struct ArchiveArgs {
 /// Dispatch a parsed CLI command. Writes human-readable output to `out`.
 pub fn run<W: Write>(cli: Cli, out: &mut W) -> std::io::Result<()> {
     match cli.command {
-        Command::Archive(args) => archive_stub(&args, out),
+        Command::Archive(args) => archive_run(&args, out),
     }
 }
 
-fn archive_stub<W: Write>(args: &ArchiveArgs, out: &mut W) -> std::io::Result<()> {
-    writeln!(out, "archive (stub)")?;
-    writeln!(out, "  binlog: {}", args.binlog.display())?;
-    writeln!(out, "  kind: {}", args.kind)?;
-    if let Some(id) = &args.pair_id {
-        writeln!(out, "  pair-id: {id}")?;
-    }
-    writeln!(out, "  out: {}", args.out.display())?;
-    writeln!(
-        out,
-        "  small-file-hash-threshold: {}",
-        args.small_file_hash_threshold
-    )?;
+fn archive_run<W: Write>(args: &ArchiveArgs, out: &mut W) -> std::io::Result<()> {
+    // M1 enforces explicit roots; auto-discovery from the binlog lands in
+    // AR-7 / AR-8.
     if args.roots.is_empty() {
-        writeln!(out, "  roots: (auto-discover)")?;
-    } else {
-        writeln!(out, "  roots:")?;
-        for r in &args.roots {
-            writeln!(out, "    - {}", r.display())?;
-        }
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "no roots specified; pass --root <path> at least once (auto-discovery lands in M2)",
+        ));
     }
+
+    let binlog_name = args
+        .binlog
+        .file_name()
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "binlog path has no filename",
+            )
+        })?
+        .to_string_lossy()
+        .into_owned();
+    let binlog_stem = args
+        .binlog
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| binlog_name.clone());
+
+    let tree = snapshot_roots(&args.roots, args.small_file_hash_threshold)?;
+
+    let captured_at = TimestampNs::from_system_time(std::time::SystemTime::now());
+    let env = CaptureEnvironment::from_process();
+    let manifest = build_manifest(ManifestInputs {
+        captured_at,
+        env: &env,
+        roots: &args.roots,
+        binlog_archive_name: &binlog_name,
+        kind: &args.kind,
+        pair_id: args.pair_id.as_deref(),
+    });
+
+    let archive_filename = compose_archive_filename(&binlog_stem, captured_at, &args.kind);
+    let archive_path = args.out.join(&archive_filename);
+
+    std::fs::create_dir_all(&args.out)?;
+    let binlog_file = std::fs::File::open(&args.binlog)?;
+    let archive_file = std::fs::File::create(&archive_path)?;
+    write_archive(
+        &ArchiveInputs {
+            binlog_name: &binlog_name,
+            tree: &tree,
+            manifest: &manifest,
+        },
+        binlog_file,
+        archive_file,
+    )?;
+
+    writeln!(out, "wrote {}", archive_path.display())?;
     Ok(())
 }
 
@@ -152,13 +194,10 @@ mod tests {
     }
 
     #[test]
-    fn run_archive_writes_parsed_summary() {
+    fn run_archive_rejects_missing_roots_in_m1() {
         let cli = parse(&["msbuild-diagnostic", "archive", "--binlog", "b.binlog"]);
         let mut buf = Vec::new();
-        run(cli, &mut buf).expect("run");
-        let s = String::from_utf8(buf).expect("utf8");
-        assert!(s.contains("archive (stub)"));
-        assert!(s.contains("b.binlog"));
-        assert!(s.contains("(auto-discover)"));
+        let err = run(cli, &mut buf).expect_err("must require explicit --root in M1");
+        assert!(err.to_string().contains("--root"));
     }
 }
