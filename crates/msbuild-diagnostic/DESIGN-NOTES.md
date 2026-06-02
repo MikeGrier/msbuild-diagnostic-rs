@@ -295,3 +295,15 @@ verification.
 
 CI runs both layers. Local development can run unit tests on every
 save (sub-second) and integration tests on milestone boundaries.
+
+
+## D-15 (M2): AR-11 integration test uses synthesized binlog
+
+AR-11 in `CHECKLIST.md` calls for an integration test driven by
+`testprojects/csharp/helloworld/msbuild.binlog`. That binlog is not
+present in the repo (no dotnet SDK on the dev host), so the AR-11 test
+synthesizes an equivalent binlog via `tests/common/synthesize_binlog`
+using `munin_msbuild::BinlogIndex::from_jsonlog` + `write_binlog`. The
+assertions remain the spec-required ones (project in inventory, at least
+one `imports/` entry, `tlogs/` directory present). The test is more
+hermetic than the spec contemplated and runs without external toolchains.
