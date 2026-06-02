@@ -349,3 +349,32 @@ to `<REDACTED-PROPERTY>` via a forward XML scan that excludes
 structural elements (`Project`, `PropertyGroup`, `ItemGroup`, etc.).
 Binary binlog redaction is deferred and will be revisited if and when
 the binlog payload is reinstated in the sanitized archive.
+
+## D-18 (M4): AR-23 ISSUE.md leakage audit
+
+AR-23 requires that every value the `ISSUE.md` template interpolates be
+sourced from a sanitized artifact. Audit at the close of M4:
+
+- `env.machine`, `env.os`, `env.arch`, `env.roots`, `env.kind` — built
+  by `SanitizedEnvironment::from_sanitized_manifest_json`, which
+  `generate_report` invokes against `manifest.json` read **out of the
+  sanitized zip** (not the input zip). Path-pseudonymization and
+  machine-name redaction have already run by that point.
+- Redaction summary table — derived purely from
+  `SanitizationReport.entries` (rule IDs and counts). No path or
+  machine data is interpolated.
+- `expected` / `actual` — operator-supplied prose. Treated as
+  operator-owned: the template does not transform it. If the operator
+  pastes a real path into their own description, that is the
+  operator's exposure, not the template's. The renderer's
+  responsibility is to not *add* leakage; the integration test
+  (`tests/report_integration_m4.rs`) asserts the rendered ISSUE.md
+  contains no real user-profile path when the operator prose itself
+  does not include one.
+- Prefilled GitHub issue URL — composed from the same sanitized
+  template body plus a sanitized title (`default_issue_title` reads
+  only `env.os` and `env.arch`).
+
+If a future field is added to `ISSUE.md`, the contract above must be
+re-verified: the value's provenance must be a sanitized artifact, and
+the AR-23 integration test should be extended to cover it.
