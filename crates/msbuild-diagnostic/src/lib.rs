@@ -4,6 +4,8 @@
 //!
 //! This is the core library crate for `msbuild-diagnostic-rs`.
 
+pub mod cli;
+
 /// Returns a hello-world greeting from this crate.
 pub fn hello() -> String {
     format!("Hello from {}!", "msbuild-diagnostic")
