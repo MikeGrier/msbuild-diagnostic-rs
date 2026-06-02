@@ -8,7 +8,6 @@ guidance in a separate file (e.g. `AGENTS.md`, a `COMPONENT.md`, or a
 
 - Be concise. Skip filler, restatement, and decorative formatting.
 - No emojis unless explicitly requested.
-- Use CRLF line endings when writing files on Windows hosts.
 - When a tool prompt requires a secret (password, token, API key), tell the
   user to type it directly into the terminal. Never collect secrets through
   ask-question UIs or model-visible channels.
@@ -400,7 +399,8 @@ At the end of every milestone, the following steps are required and must
   text>`.
 - **Check the item off** in `CHECKLIST.md` (`- [ ]` → `- [x]`) in the
   same commit.
-- After the commit, pull / rebase from origin then push.
+- After the commit, pull / rebase from origin. Push only at milestone
+  boundaries unless prompted to do so.
 - **Tests must pass** before committing. Run the appropriate test
   command after each item and fix failures before committing.
   Pre-existing failures unrelated to the current item do not block the
@@ -502,7 +502,6 @@ Include the date of the move in `YYYY/MM/DD` format.
 ## Quality
 
 ### Coverage expectations
-car
 Tests must cover at least 10 normal cases plus every identifiable edge
 case, unless edge-case computation would be excessive on a modern
 system. Unit tests for a submodule should complete in **under one
