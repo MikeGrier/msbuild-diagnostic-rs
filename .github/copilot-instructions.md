@@ -261,6 +261,41 @@ task, raise the issue to the engineer driving forward progress so the
 decision to fix-now or defer is explicit. The default is always: fix the
 bug where it lives.
 
+## Defect-class harvesting — ask "what class of learning is this?"
+
+Every defect, surprise, or "huh, that's weird" moment is an instance of
+a **class** of similar problems we will see again. Before fixing it
+in-place and moving on, pause for a one-line judgement call:
+
+> Is this an isolated typo / one-off mistake, or is it an instance of a
+> recurring class — something where the next instance will look
+> *different in detail but identical in shape*?
+
+If it's a class, do **not** just fix the instance. Take the small extra
+step that converts the one fix into ongoing leverage. Concretely:
+
+- A bug that a check could have caught → add the check (lint, test,
+  schema validation, CI guard), not just the fix.
+- A surprise the docs / design notes didn't predict → add a
+  `DESIGN-NOTES.md` entry (or update one) capturing the invariant, so
+  the next reader is not surprised.
+- A workflow step that was easy to forget → add it to a checklist
+  template or to `copilot-instructions.md`.
+- A diagnostic that took multiple round-trips to understand → improve
+  the tool's output (or file a checklist item to), so the next
+  occurrence is self-explanatory.
+- A class of user data we hadn't classified → add the classification
+  rule (e.g. sanitization-rule registry) in the same commit as the fix.
+
+The rule is **not** "always take the long path". Small one-offs stay
+small. The rule is: never skip the 30-second judgement call. The cost
+of asking is trivial; the cost of repeatedly re-learning the same
+class of lesson compounds.
+
+When in doubt, default to capturing the lesson in writing (a
+`DESIGN-NOTES.md` entry, a memory note, or a new check). The cheapest
+form of harvest is a single-line note that a future search can find.
+
 ## Coding conventions
 
 ### No manifest numeric constants in source code
