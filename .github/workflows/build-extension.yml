@@ -54,15 +54,20 @@ jobs:
       - name: Install Rust toolchain (${{ matrix.rust_target }})
         uses: dtolnay/rust-toolchain@stable
         with:
+          # Pin to the exact version selected by `rust-toolchain.toml`.
+          # Using `stable` here resolves to whatever rustc is currently
+          # newest, which then gets overridden by the workspace's pinned
+          # toolchain — leaving the matrix target installed under the
+          # wrong toolchain and breaking cross-compile with E0463.
+          toolchain: "1.95.0"
           targets: ${{ matrix.rust_target }}
 
-      # `rust-toolchain.toml` pins the active toolchain to a specific
-      # version, which overrides the `stable` toolchain installed above.
-      # dtolnay's action adds the matrix target to `stable`, not to the
-      # pinned toolchain, so explicitly add it to the toolchain that will
-      # actually run the build. Without this, cross-compiling to a target
-      # whose std isn't already installed fails with E0463.
-      - name: Add target to pinned toolchain
+      # Belt-and-suspenders: when `rust-toolchain.toml` selects the active
+      # toolchain inside the workspace, the target added by the action
+      # above may not be visible to the rust-toolchain.toml-selected
+      # install. Re-add explicitly under the workspace toolchain.
+      - name: rustup target add ${{ matrix.rust_target }}
+        working-directory: ${{ github.workspace }}
         run: rustup target add ${{ matrix.rust_target }}
 
       - name: Cache cargo
