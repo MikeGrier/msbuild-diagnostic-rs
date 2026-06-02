@@ -12,6 +12,7 @@ pub mod manifest;
 pub mod roots;
 pub mod sanitize;
 pub mod snapshot;
+pub mod targets;
 pub mod tlogs;
 
 /// Returns a hello-world greeting from this crate.
