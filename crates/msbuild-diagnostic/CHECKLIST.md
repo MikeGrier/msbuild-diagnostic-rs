@@ -18,7 +18,7 @@ dependency order. Every milestone ends with an integration test and
 
 ## Milestone 2 — Binlog-informed enumeration
 
-- [ ] **AR-7**: Parse the binlog with `munin_msbuild::BinlogIndex::open`. Extract project file paths from `ProjectStarted` events; expose via a typed `BinlogProjectInventory` struct.
+- [x] **AR-7**: Parse the binlog with `munin_msbuild::BinlogIndex::open`. Extract project file paths from `ProjectStarted` events; expose via a typed `BinlogProjectInventory` struct.
 - [ ] **AR-8**: Implement default root discovery (when `--root` not supplied): binlog dir + each project file's parent dir + git root. Dedupe overlapping paths.
 - [ ] **AR-9**: Extract embedded `ProjectImportArchive` entries via `BinlogReader::extract_archives` into `imports/` in the zip, preserving relative paths.
 - [ ] **AR-10**: For each project dir, locate `obj/` and copy all `*.tlog` files into the zip under `tlogs/<project-relpath>/`. Files outside any project's `obj/` are not collected.
