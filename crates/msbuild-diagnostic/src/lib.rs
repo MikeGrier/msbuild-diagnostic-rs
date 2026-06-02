@@ -10,6 +10,7 @@ pub mod cli;
 pub mod correlate;
 pub mod diff;
 pub mod manifest;
+pub mod report;
 pub mod roots;
 pub mod sanitize;
 pub mod snapshot;

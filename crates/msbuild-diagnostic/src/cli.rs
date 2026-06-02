@@ -45,6 +45,9 @@ pub enum Command {
     Diff(DiffArgs),
     /// Sanitize a capture archive into a shareable counterpart (AR-18).
     Sanitize(SanitizeArgs),
+    /// Package one or two capture archives into a submission with a
+    /// prefilled GitHub issue URL (AR-20 / AR-21).
+    Report(ReportArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -120,12 +123,34 @@ pub struct SanitizeArgs {
     pub map: Option<PathBuf>,
 }
 
+#[derive(Debug, clap::Args)]
+pub struct ReportArgs {
+    /// Single capture archive to report on. Mutually exclusive with
+    /// `--pair`.
+    pub input: Option<PathBuf>,
+    /// Two capture archives (T1 then T2) to report on as a pair.
+    /// Mutually exclusive with the positional `input`.
+    #[arg(long = "pair", num_args = 2, value_names = ["T1", "T2"])]
+    pub pair: Option<Vec<PathBuf>>,
+    /// Operator's expected behavior, free text.
+    #[arg(long)]
+    pub expected: String,
+    /// Operator's actual observed behavior, free text.
+    #[arg(long)]
+    pub actual: String,
+    /// Directory to write `submission.zip`, `submission-preview/`,
+    /// and `ISSUE.md` into. Created if absent.
+    #[arg(long)]
+    pub out: PathBuf,
+}
+
 /// Dispatch a parsed CLI command. Writes human-readable output to `out`.
 pub fn run<W: Write>(cli: Cli, out: &mut W) -> std::io::Result<()> {
     match cli.command {
         Command::Archive(args) => archive_run(&args, out),
         Command::Diff(args) => diff_run(&args, out),
         Command::Sanitize(args) => sanitize_run(&args, out),
+        Command::Report(args) => report_run(&args, out),
     }
 }
 
@@ -327,6 +352,48 @@ fn sanitize_run<W: Write>(args: &SanitizeArgs, out: &mut W) -> std::io::Result<(
         unknown
     )?;
     writeln!(out, "wrote {} (pseudonym map; KEEP LOCAL)", map.display())?;
+    Ok(())
+}
+
+fn report_run<W: Write>(args: &ReportArgs, out: &mut W) -> std::io::Result<()> {
+    let inputs: Vec<PathBuf> = match (&args.input, &args.pair) {
+        (Some(_), Some(_)) => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "--pair and positional input are mutually exclusive",
+            ));
+        }
+        (None, None) => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "report requires an input archive or --pair T1 T2",
+            ));
+        }
+        (Some(p), None) => vec![p.clone()],
+        (None, Some(pair)) => pair.clone(),
+    };
+    let pseudonymizer = crate::sanitize::pseudonym::Pseudonymizer::from_environment();
+    let artifacts = crate::report::generate_report(&crate::report::ReportInputs {
+        inputs: &inputs,
+        expected: &args.expected,
+        actual: &args.actual,
+        out_dir: &args.out,
+        pseudonymizer: &pseudonymizer,
+        issue_base_url: crate::report::DEFAULT_ISSUE_BASE_URL,
+    })?;
+    writeln!(out, "wrote {}", artifacts.submission_zip.display())?;
+    writeln!(
+        out,
+        "extracted preview at {}",
+        artifacts.preview_dir.display()
+    )?;
+    writeln!(out, "wrote {}", artifacts.issue_md.display())?;
+    writeln!(out)?;
+    writeln!(
+        out,
+        "Open the prefilled issue URL in your browser and ATTACH submission.zip manually:"
+    )?;
+    writeln!(out, "{}", artifacts.issue_url)?;
     Ok(())
 }
 
