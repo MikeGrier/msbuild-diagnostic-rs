@@ -4,6 +4,7 @@
 //!
 //! This is the core library crate for `msbuild-diagnostic-rs`.
 
+pub mod archive;
 pub mod cli;
 pub mod snapshot;
 
