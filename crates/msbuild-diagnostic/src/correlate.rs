@@ -301,8 +301,13 @@ fn same_kind(a: &EntryKind, b: &EntryKind) -> bool {
 
 /// Render `report` as Markdown into `w`. Uses [`Write`] as the output
 /// abstraction so the same routine drives in-memory buffers (tests),
-/// files (CLI), and pipes (future MCP tool).
-pub fn write_markdown_report<W: Write>(report: &CorrelationReport, w: &mut W) -> io::Result<()> {
+/// files (CLI), and pipes (future MCP tool). All path-bearing and
+/// message fields are routed through `pseudonymizer` per AR-17 / D-9.
+pub fn write_markdown_report<W: Write>(
+    report: &CorrelationReport,
+    w: &mut W,
+    pseudonymizer: &crate::sanitize::pseudonym::Pseudonymizer,
+) -> io::Result<()> {
     writeln!(w, "# Incremental build correlation report")?;
     writeln!(w)?;
     writeln!(
@@ -322,10 +327,18 @@ pub fn write_markdown_report<W: Write>(report: &CorrelationReport, w: &mut W) ->
             writeln!(w, "- Target: `{t}`")?;
         }
         if let Some(p) = &f.project_file {
-            writeln!(w, "- Project: `{}`", p)?;
+            writeln!(w, "- Project: `{}`", pseudonymizer.rewrite(p))?;
         }
-        writeln!(w, "- Input:  `{}`", f.input_path.display())?;
-        writeln!(w, "- Output: `{}`", f.output_path.display())?;
+        writeln!(
+            w,
+            "- Input:  `{}`",
+            pseudonymizer.rewrite(&f.input_path.display().to_string())
+        )?;
+        writeln!(
+            w,
+            "- Output: `{}`",
+            pseudonymizer.rewrite(&f.output_path.display().to_string())
+        )?;
         write_change(w, "Input", &f.input)?;
         write_change(w, "Output", &f.output)?;
         writeln!(w)?;
@@ -521,7 +534,7 @@ mod tests {
             }],
         };
         let mut buf = Vec::new();
-        write_markdown_report(&report, &mut buf).unwrap();
+        write_markdown_report(&report, &mut buf, &crate::sanitize::pseudonym::Pseudonymizer::noop()).unwrap();
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains("# Incremental build correlation report"));
         assert!(s.contains("Compile"));
@@ -536,7 +549,7 @@ mod tests {
             findings: Vec::new(),
         };
         let mut buf = Vec::new();
-        write_markdown_report(&report, &mut buf).unwrap();
+        write_markdown_report(&report, &mut buf, &crate::sanitize::pseudonym::Pseudonymizer::noop()).unwrap();
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains("No `is newer than`"));
     }
@@ -557,6 +570,44 @@ mod tests {
         let s = serde_json::to_string(&report).unwrap();
         let back: CorrelationReport = serde_json::from_str(&s).unwrap();
         assert_eq!(back, report);
+    }
+
+    #[test]
+    fn markdown_report_pseudonymizes_user_profile_path() {
+        // AR-17 sanitization checkpoint. Construct a report whose
+        // paths sit inside an explicit "user profile" prefix, render
+        // it through a Pseudonymizer with that same prefix, and assert
+        // that the rendered Markdown contains `<USER>` and not the
+        // raw prefix.
+        let profile = "/home/synthetic-user";
+        let report = CorrelationReport {
+            schema_version: CORRELATION_REPORT_SCHEMA_VERSION,
+            findings: vec![CorrelationFinding {
+                target_name: Some("Compile".into()),
+                project_file: Some(format!("{profile}/proj/p.csproj")),
+                input_path: PathBuf::from(format!("{profile}/proj/src/a.cs")),
+                output_path: PathBuf::from(format!("{profile}/proj/bin/a.dll")),
+                input: Some(EntryChange {
+                    before: None,
+                    after: None,
+                    mtime_changed: true,
+                    sha256_changed: false,
+                    content_identical: true,
+                }),
+                output: None,
+            }],
+        };
+        let p = crate::sanitize::pseudonym::Pseudonymizer::from_explicit(Some(profile.into()));
+        let mut buf = Vec::new();
+        write_markdown_report(&report, &mut buf, &p).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(
+            !s.contains(profile),
+            "raw user-profile prefix leaked into report:\n{s}"
+        );
+        assert!(s.contains("<USER>/proj/src/a.cs"), "missing pseudonymized input path:\n{s}");
+        assert!(s.contains("<USER>/proj/bin/a.dll"), "missing pseudonymized output path:\n{s}");
+        assert!(s.contains("<USER>/proj/p.csproj"), "missing pseudonymized project file:\n{s}");
     }
 
     #[test]

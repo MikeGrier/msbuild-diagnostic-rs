@@ -184,10 +184,79 @@ pub const M2_FIELD_RULES: &[FieldRule] = &[
     ),
 ];
 
+/// Per-field decisions for every field introduced by M3 (diff +
+/// correlation reports). Walked alongside [`M1_FIELD_RULES`] and
+/// [`M2_FIELD_RULES`] by [`classify`].
+pub const M3_FIELD_RULES: &[FieldRule] = &[
+    // diff-report.json — describes a tree-snapshot pair. Path-bearing
+    // fields use the same pseudonym rule as `tree.json`; per-entry
+    // value fields (size / mtime / sha256) are inherently safe.
+    field("diff-report.json", "schema_version", Classification::Verbatim),
+    field(
+        "diff-report.json",
+        "roots.root",
+        Classification::Redact(RedactRule::PathPseudonym),
+    ),
+    field(
+        "diff-report.json",
+        "roots.added.relpath",
+        Classification::Redact(RedactRule::PathPseudonym),
+    ),
+    field(
+        "diff-report.json",
+        "roots.removed.relpath",
+        Classification::Redact(RedactRule::PathPseudonym),
+    ),
+    field(
+        "diff-report.json",
+        "roots.changed.relpath",
+        Classification::Redact(RedactRule::PathPseudonym),
+    ),
+    field(
+        "diff-report.json",
+        "roots.unchanged.relpath",
+        Classification::Redact(RedactRule::PathPseudonym),
+    ),
+    // correlation-report.md — quotes paths and binlog message text
+    // directly. Paths use the pseudonym map; message text is treated
+    // with the same property-value redaction as M2's
+    // ProjectStarted.properties.value, because the message body may
+    // include property substitutions captured from the build.
+    field(
+        "correlation-report.md",
+        "finding.input_path",
+        Classification::Redact(RedactRule::PathPseudonym),
+    ),
+    field(
+        "correlation-report.md",
+        "finding.output_path",
+        Classification::Redact(RedactRule::PathPseudonym),
+    ),
+    field(
+        "correlation-report.md",
+        "finding.project_file",
+        Classification::Redact(RedactRule::PathPseudonym),
+    ),
+    field(
+        "correlation-report.md",
+        "finding.target_name",
+        Classification::Verbatim,
+    ),
+    field(
+        "correlation-report.md",
+        "finding.reason_message",
+        Classification::Redact(RedactRule::BinlogPropertyValue),
+    ),
+];
+
 /// Look up the classification for `(artifact, field)`. Deny-by-default:
 /// unknown fields return [`Classification::Drop`].
 pub fn classify(artifact: &str, field: &str) -> Classification {
-    for rule in M1_FIELD_RULES.iter().chain(M2_FIELD_RULES.iter()) {
+    for rule in M1_FIELD_RULES
+        .iter()
+        .chain(M2_FIELD_RULES.iter())
+        .chain(M3_FIELD_RULES.iter())
+    {
         if rule.artifact == artifact && rule.field == field {
             return rule.classification;
         }
@@ -269,7 +338,11 @@ mod tests {
 
     #[test]
     fn every_rule_pair_is_unique_across_all_milestones() {
-        let all: Vec<&FieldRule> = M1_FIELD_RULES.iter().chain(M2_FIELD_RULES.iter()).collect();
+        let all: Vec<&FieldRule> = M1_FIELD_RULES
+            .iter()
+            .chain(M2_FIELD_RULES.iter())
+            .chain(M3_FIELD_RULES.iter())
+            .collect();
         for (i, a) in all.iter().enumerate() {
             for b in &all[i + 1..] {
                 assert!(
@@ -355,6 +428,50 @@ mod tests {
         assert_eq!(
             classify("binlog.events", "TaskStarted.properties.value"),
             Classification::Drop
+        );
+    }
+
+    #[test]
+    fn m3_correlation_report_paths_are_pseudonymized() {
+        assert_eq!(
+            classify("correlation-report.md", "finding.input_path"),
+            Classification::Redact(RedactRule::PathPseudonym)
+        );
+        assert_eq!(
+            classify("correlation-report.md", "finding.output_path"),
+            Classification::Redact(RedactRule::PathPseudonym)
+        );
+        assert_eq!(
+            classify("correlation-report.md", "finding.project_file"),
+            Classification::Redact(RedactRule::PathPseudonym)
+        );
+    }
+
+    #[test]
+    fn m3_correlation_report_message_redacts_with_binlog_property_value_rule() {
+        assert_eq!(
+            classify("correlation-report.md", "finding.reason_message"),
+            Classification::Redact(RedactRule::BinlogPropertyValue)
+        );
+        assert_eq!(
+            classify("correlation-report.md", "finding.target_name"),
+            Classification::Verbatim
+        );
+    }
+
+    #[test]
+    fn m3_diff_report_per_entry_paths_are_pseudonymized() {
+        for sect in ["added", "removed", "changed", "unchanged"] {
+            let field = format!("roots.{sect}.relpath");
+            assert_eq!(
+                classify("diff-report.json", &field),
+                Classification::Redact(RedactRule::PathPseudonym),
+                "diff-report.json {field} must be pseudonymized"
+            );
+        }
+        assert_eq!(
+            classify("diff-report.json", "roots.root"),
+            Classification::Redact(RedactRule::PathPseudonym)
         );
     }
 }

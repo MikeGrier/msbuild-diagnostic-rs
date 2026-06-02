@@ -275,7 +275,8 @@ fn diff_run<W: Write>(args: &DiffArgs, out: &mut W) -> std::io::Result<()> {
             }
         }
         let mut md = std::fs::File::create(&md_path)?;
-        write_markdown_report(&report, &mut md)?;
+        let pseudonymizer = crate::sanitize::pseudonym::Pseudonymizer::from_environment();
+        write_markdown_report(&report, &mut md, &pseudonymizer)?;
         writeln!(
             out,
             "wrote {} (findings={})",
