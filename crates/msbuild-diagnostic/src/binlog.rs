@@ -113,6 +113,16 @@ fn munin_to_io(e: munin_msbuild::MuninError) -> io::Error {
     io::Error::other(format!("binlog parse: {e}"))
 }
 
+/// Read `path` and return the raw event stream. Thin FS + parse wrapper
+/// used by AR-15 correlation (the pure model builder consumes a slice
+/// of [`BinlogEvent`]; this function is the only place that opens the
+/// file).
+pub fn read_binlog_events(path: &Path) -> io::Result<Vec<BinlogEvent>> {
+    let f = File::open(path)?;
+    let index = BinlogIndex::open(BufReader::new(f)).map_err(munin_to_io)?;
+    index.get_all().map_err(munin_to_io)
+}
+
 #[cfg(test)]
 mod tests {
     //! Hermetic unit tests (D-14). All inputs are constructed in memory.

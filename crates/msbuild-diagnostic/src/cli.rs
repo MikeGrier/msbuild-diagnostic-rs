@@ -13,6 +13,7 @@ use clap::{Parser, Subcommand};
 
 use crate::archive::{write_archive, ArchiveInputs, TREE_JSON_NAME};
 use crate::binlog::read_binlog;
+use crate::correlate::{build_binlog_model, correlate, write_markdown_report};
 use crate::diff::diff_snapshots;
 use crate::manifest::{
     build_manifest, compose_archive_filename, CaptureEnvironment, ManifestInputs,
@@ -76,6 +77,11 @@ pub struct ArchiveArgs {
 /// Default name for the JSON diff report written by [`diff_run`].
 pub const DEFAULT_DIFF_REPORT_NAME: &str = "diff-report.json";
 
+/// Default name for the Markdown correlation report written by
+/// [`diff_run`] when `--binlog` is supplied without an explicit
+/// `--markdown` path.
+pub const DEFAULT_CORRELATION_REPORT_NAME: &str = "correlation-report.md";
+
 #[derive(Debug, clap::Args)]
 pub struct DiffArgs {
     /// First ("T1") snapshot archive.
@@ -86,6 +92,15 @@ pub struct DiffArgs {
     /// `diff-report.json` in the current directory.
     #[arg(long)]
     pub out: Option<PathBuf>,
+    /// Path to the T2 binlog. When supplied, the AR-15 correlator
+    /// runs and writes a Markdown report alongside the JSON diff.
+    #[arg(long)]
+    pub binlog: Option<PathBuf>,
+    /// Path to write the Markdown correlation report to. Implies
+    /// `--binlog`; defaults to `correlation-report.md` next to the
+    /// JSON diff when `--binlog` is supplied without it.
+    #[arg(long)]
+    pub markdown: Option<PathBuf>,
 }
 
 /// Dispatch a parsed CLI command. Writes human-readable output to `out`.
@@ -232,6 +247,43 @@ fn diff_run<W: Write>(args: &DiffArgs, out: &mut W) -> std::io::Result<()> {
         "wrote {} (added={added}, removed={removed}, changed={changed}, unchanged={unchanged})",
         out_path.display()
     )?;
+
+    let binlog_path = args.binlog.as_ref().or_else(|| {
+        // `--markdown` implies `--binlog`; the binlog path is required
+        // either way when correlation is requested.
+        args.markdown.as_ref().and(args.binlog.as_ref())
+    });
+    if args.markdown.is_some() && args.binlog.is_none() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "--markdown requires --binlog",
+        ));
+    }
+    if let Some(binlog) = binlog_path {
+        let events = crate::binlog::read_binlog_events(binlog)?;
+        let model = build_binlog_model(&events);
+        let report = correlate(&model, &t1, &t2);
+        let md_path = args.markdown.clone().unwrap_or_else(|| {
+            out_path
+                .parent()
+                .map(|p| p.join(DEFAULT_CORRELATION_REPORT_NAME))
+                .unwrap_or_else(|| PathBuf::from(DEFAULT_CORRELATION_REPORT_NAME))
+        });
+        if let Some(parent) = md_path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+        let mut md = std::fs::File::create(&md_path)?;
+        write_markdown_report(&report, &mut md)?;
+        writeln!(
+            out,
+            "wrote {} (findings={})",
+            md_path.display(),
+            report.findings.len()
+        )?;
+    }
+
     Ok(())
 }
 

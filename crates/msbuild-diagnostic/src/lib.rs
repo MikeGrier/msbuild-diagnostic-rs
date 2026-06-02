@@ -7,6 +7,7 @@
 pub mod archive;
 pub mod binlog;
 pub mod cli;
+pub mod correlate;
 pub mod diff;
 pub mod manifest;
 pub mod roots;
