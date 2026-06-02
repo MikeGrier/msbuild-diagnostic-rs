@@ -264,7 +264,7 @@ pub fn sanitize_archive(inputs: &SanitizeInputs<'_>) -> io::Result<SanitizationR
                 entries.push(SanitizationEntry {
                     path: name.clone(),
                     disposition: Disposition::Dropped,
-                    rule: None,
+                    rule: Some("unknown-artifact".into()),
                     reason: Some("unknown artifact (deny-by-default per D-9)".into()),
                 });
             }
