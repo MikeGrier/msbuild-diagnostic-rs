@@ -82,6 +82,12 @@ smart quotes, em-dashes, and box-drawing characters.
   do not round-trip non-ASCII files through `Get-Content` / `Set-Content`
   — read and write via `[System.IO.File]::ReadAllBytes` /
   `WriteAllBytes`.
+- When `tpu_*` tools are unavailable on a non-Windows host (Linux/macOS
+  bash, zsh, etc.), ensure a UTF-8 locale before running text tools
+  (`LC_ALL=C.UTF-8` or `LC_ALL=en_US.UTF-8`), and never pipe binary
+  files through text utilities (`cat`, `sed`, `awk`, `tr`) — operate on
+  them with byte-safe tools (`dd`, `xxd`, `od`, language-native byte
+  APIs) instead.
 - Text content sent to `tpu_*` tools is auto-normalized to LF before
   processing; the file's existing line-ending convention is preserved on
   disk.
