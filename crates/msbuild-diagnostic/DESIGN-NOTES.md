@@ -16,6 +16,9 @@ decision answers "what is the decision?" and "what constraint forced it?".
 - [D-9: Sanitization pipeline — deny-by-default, user-verified, reversible locally](#d-9-sanitization-pipeline)
 - [D-10: Sanitization checkpoint at every milestone](#d-10-sanitization-checkpoint-at-every-milestone)
 - [D-11: Submission path — GitHub issue prefill, never auto-upload](#d-11-submission-path)
+- [D-12: All algorithms operate on persisted data models, never on the live filesystem](#d-12-all-algorithms-operate-on-persisted-data-models)
+- [D-13: Timestamp serialization — `i128` nanoseconds since Unix epoch, JSON string](#d-13-timestamp-serialization)
+- [D-14: Test layering — unit tests hermetic, integration tests may touch the filesystem](#d-14-test-layering)
 
 ---
 
@@ -66,9 +69,10 @@ ground-truth timestamps that the binlog's reasoning refers to.
 ### D-4: File-tree snapshot record schema
 
 Each entry in `tree.json` is `{ "relpath": String, "size": u64,
-"mtime_unix_nanos": i128, "sha256": Option<String> }`. SHA-256 is
+"mtime_unix_nanos": String, "sha256": Option<String> }`. SHA-256 is
 computed only when `size <= small_file_hash_threshold` (default 1
-MiB).
+MiB). `mtime_unix_nanos` is serialized as a JSON **string** containing
+an `i128` decimal value (see D-13).
 
 Constraint: distinguishing "file was re-stamped with identical
 content" from "file actually changed" requires content identity. For
@@ -208,3 +212,86 @@ implies we are taking responsibility for storage and access control
 of user data. We are not equipped to do that responsibly in the
 iteration phase. The manual attach step is friction we accept in
 exchange for zero data-custody liability.
+
+### D-12: All algorithms operate on persisted data models
+
+Every algorithm in this crate — diff, sanitization, binlog
+correlation, report rendering, anything we add later — takes typed
+data values as input (`TreeSnapshot`, `BinlogModel`, `Manifest`,
+etc.) that round-trip losslessly through JSON. **The only code
+permitted to touch `std::fs::metadata`, `read_dir`, or otherwise
+observe the live filesystem is the snapshotter**, whose sole job is
+to convert a directory tree into a `TreeSnapshot` value. Everything
+downstream consumes that value (or a deserialized JSON copy of it)
+and never re-queries the filesystem.
+
+Constraint: the analysis we are building exists precisely *because*
+the live filesystem at any later moment may not match the state
+MSBuild observed. Re-reading mtimes during analysis would re-introduce
+the very ambiguity (clock skew, virus-scanner touch, retry timing)
+the archive exists to eliminate. Funneling all algorithms through a
+captured-at-a-moment data model also makes them trivially testable
+(D-14), trivially diffable, and trivially auditable: anything the
+sanitizer cares about is visible in JSON before redaction.
+
+Forbidden in non-snapshotter code: `std::fs::metadata`,
+`File::open` of an input being analyzed, `SystemTime::now` (capture
+time must be passed in), reading any path outside the archive being
+processed.
+
+### D-13: Timestamp serialization
+
+Timestamps in our JSON formats are serialized as **JSON strings
+containing a decimal `i128` count of nanoseconds since the Unix
+epoch** (e.g. `"mtime_unix_nanos": "1748880235123456700"`). Capture
+fills this from `SystemTime::duration_since(UNIX_EPOCH)` widened to
+`i128` nanoseconds. Negative values are valid (pre-1970 mtimes are
+rare but legal).
+
+Constraint: we need exact, lossless representation of Windows
+FILETIME (100 ns resolution) and any finer resolution Linux ext4 may
+report (1 ns). JSON numbers are not reliably round-trippable through
+parsers that treat them as `f64` (loss begins at 2^53 ns ≈ year
+2255, but tooling rounds earlier in practice); strings sidestep that
+entirely. RFC 3339 was considered and rejected for this field
+because parsing back to a precise integer requires per-implementation
+care with sub-second digits and offsets, and we never need the
+human-readable form for algorithmic comparison. A separate
+human-readable rendering can be added at presentation time without
+changing the canonical form.
+
+### D-14: Test layering
+
+**Unit tests** in this crate must be hermetic. They construct
+`TreeSnapshot`, `BinlogModel`, and other input values either inline
+in Rust or by deserializing checked-in JSON fixtures, then assert on
+the algorithm's output. **Unit tests must not create files, must not
+call `set_modified`, must not invoke `dotnet` or `MSBuild`, must not
+spawn processes.** This is the working surface for every algorithm
+in the crate (per D-12) and the layer that runs in single-digit
+milliseconds per test.
+
+**Integration tests** are allowed to materialize files on disk, set
+mtimes via `std::fs::File::set_modified` (which calls `SetFileTime`
+on Windows and preserves full FILETIME resolution; no `windows-sys`
+dependency needed), invoke real MSBuild against a fixture project to
+produce a real binlog, and otherwise exercise the seams between this
+crate and the OS. They live under `tests/` and may take seconds.
+Time-sensitive integration tests should use a `touch_with_mtime`
+helper rather than sprinkling `set_modified` calls; the snapshotter's
+own correctness is verified by integration tests asserting the
+resulting `TreeSnapshot` matches expected structural properties (not
+exact mtime values, since those are an OS-level concern not an
+algorithm concern).
+
+Constraint: this split is the reason D-12 is enforceable. Without a
+hermetic unit-test layer that is too cheap not to write, the
+temptation to test algorithms by materializing files would creep back
+and the live-filesystem boundary would erode. The integration layer
+exists so we can still prove, end-to-end, that the snapshotter
+actually captures what we believe it captures — but it stays scoped
+to the snapshotter and to whole-tool smoke tests, not to algorithm
+verification.
+
+CI runs both layers. Local development can run unit tests on every
+save (sub-second) and integration tests on milestone boundaries.
