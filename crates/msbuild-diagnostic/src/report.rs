@@ -522,4 +522,14 @@ mod tests {
         let t = default_issue_title(&env);
         assert_eq!(t, "Incremental-build report (linux / x86_64)");
     }
+
+    #[test]
+    fn default_issue_base_url_matches_ar21_spec() {
+        // AR-21 specifies this exact URL prefix. If the repo ever
+        // moves, the spec and this constant must both be updated.
+        assert_eq!(
+            DEFAULT_ISSUE_BASE_URL,
+            "https://github.com/MikeGrier/msbuild-diagnostic-rs/issues/new"
+        );
+    }
 }
