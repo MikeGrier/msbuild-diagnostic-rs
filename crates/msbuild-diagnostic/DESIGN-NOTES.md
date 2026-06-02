@@ -307,3 +307,22 @@ using `munin_msbuild::BinlogIndex::from_jsonlog` + `write_binlog`. The
 assertions remain the spec-required ones (project in inventory, at least
 one `imports/` entry, `tlogs/` directory present). The test is more
 hermetic than the spec contemplated and runs without external toolchains.
+
+
+## D-16 (M3): AR-16 integration test uses synthesized binlog with TargetStarted + BuildMessage
+
+AR-16 in `CHECKLIST.md` calls for "build a real tiny fixture project
+with MSBuild to produce a real binlog". That requires a dotnet SDK,
+which is not present on the dev host. Following the D-15 deviation
+pattern, the AR-16 test synthesizes an equivalent binlog via
+`tests/common/synthesize_correlation_binlog`: one
+`ProjectStarted`, one `TargetStarted` per case, and one
+`BuildMessage` per case whose text reads `Input file "<input>" is
+newer than output file "<output>".`. The synthesizer must explicitly
+set `BuildEventArgsFields::flags` to include the `MESSAGE` bit
+(`0x0004`) because munin's binlog writer is flags-driven: the
+`message` string is only serialized when the bit is set on the
+in-memory field block. The assertions remain spec-required: the diff
+report identifies a touched-but-content-identical input. The test runs
+without external toolchains and exercises the full `diff --binlog
+--markdown` pipeline on real archive zips on disk.

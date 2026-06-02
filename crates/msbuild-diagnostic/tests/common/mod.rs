@@ -88,6 +88,70 @@ fn write_jsonlog(file: JsonlogFile) -> Vec<u8> {
     out
 }
 
+/// Synthesize a binlog containing one `ProjectStarted` event plus, for
+/// each `(target, input, output)` triple, a `TargetStarted` (with
+/// `project_file` set to `project_file`) followed by a `BuildMessage`
+/// reading `Input file "<input>" is newer than output file "<output>".`.
+/// AR-16 uses this to drive the AR-15 correlator without requiring a
+/// real MSBuild invocation (per the D-15 deviation pattern).
+pub fn synthesize_correlation_binlog(
+    project_file: &str,
+    newer_than: &[(&str, &str, &str)],
+) -> Vec<u8> {
+    let mut events: Vec<JsonlogEvent> = Vec::new();
+    let proj_ev = munin_msbuild::events::ProjectStartedEvent {
+        project_file: Some(project_file.into()),
+        ..munin_msbuild::events::ProjectStartedEvent::default()
+    };
+    events.push(JsonlogEvent {
+        kind: "ProjectStarted".to_string(),
+        byte_offset: 0,
+        body: JsonlogEventBody::Decoded(serde_json::to_value(&proj_ev).expect("event json")),
+    });
+
+    let mut offset: u64 = 1;
+    for (target, input, output) in newer_than {
+        let ts = munin_msbuild::events::TargetStartedEvent {
+            target_name: Some((*target).into()),
+            project_file: Some(project_file.into()),
+            ..munin_msbuild::events::TargetStartedEvent::default()
+        };
+        events.push(JsonlogEvent {
+            kind: "TargetStarted".to_string(),
+            byte_offset: offset,
+            body: JsonlogEventBody::Decoded(serde_json::to_value(&ts).expect("event json")),
+        });
+        offset += 1;
+
+        let mut msg = munin_msbuild::events::BuildMessageEvent::default();
+        msg.fields.message = Some(format!(
+            "Input file \"{input}\" is newer than output file \"{output}\"."
+        ));
+        // Field-flag bitmask must include MESSAGE so write_binlog
+        // serializes the message string (munin's binlog writer is
+        // flags-driven).
+        msg.fields.flags = munin_msbuild::BuildEventArgsFieldFlags::from_raw(0x0004);
+        events.push(JsonlogEvent {
+            kind: "Message".to_string(),
+            byte_offset: offset,
+            body: JsonlogEventBody::Decoded(serde_json::to_value(&msg).expect("event json")),
+        });
+        offset += 1;
+    }
+
+    write_jsonlog(JsonlogFile {
+        munin_jsonlog_version: 1,
+        header: JsonlogHeader {
+            file_format_version: 18,
+            min_reader_version: 14,
+        },
+        strings: vec![],
+        name_value_lists: vec![],
+        archives: vec![],
+        events,
+    })
+}
+
 fn build_import_archive_zip(entries: &[(&str, &str)]) -> Vec<u8> {
     if entries.is_empty() {
         return Vec::new();
