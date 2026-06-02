@@ -324,8 +324,16 @@ source-components nested inside.
 
 ## Planning — always plan in CHECKLIST.md
 
-- For any non-trivial change, write the plan as a `CHECKLIST.md` at the
-  **lowest common source-component** that contains the change.
+- Write a plan as a `CHECKLIST.md` at the **lowest common
+  source-component** that contains the change whenever **any** of the
+  following is true:
+  - the change touches **more than one file**, **or**
+  - the change adds/removes/modifies **more than ~20 lines** total, **or**
+  - the change spans **more than one source-component**, **or**
+  - the change requires **more than one commit** to land, **or**
+  - the user explicitly asks for a plan.
+  Single-file edits of ≤20 lines (typo fixes, one-line bug fixes,
+  rename-in-place, comment tweaks) do **not** require a CHECKLIST.
 - Keep the plan up to date as it executes.
 - Maintain a `PLANS.md` at the repository root tracking every active
   `CHECKLIST.md` and its status. Create it if missing.
