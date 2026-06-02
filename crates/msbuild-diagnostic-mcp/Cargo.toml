@@ -23,6 +23,6 @@ name = "msbuild-diagnostic-mcp"
 path = "src/main.rs"
 
 [dependencies]
-msbuild-diagnostic = { path = "../msbuild-diagnostic", version = "0.1.0" } # x-release-please-version
+msbuild-diagnostic = { path = "../msbuild-diagnostic", version = "0.2.0" } # x-release-please-version
 serde      = { workspace = true }
 serde_json = { workspace = true }
