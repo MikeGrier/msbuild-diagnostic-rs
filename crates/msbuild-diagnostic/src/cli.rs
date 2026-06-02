@@ -12,8 +12,12 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use crate::archive::{write_archive, ArchiveInputs};
+use crate::binlog::read_binlog;
 use crate::manifest::{
     build_manifest, compose_archive_filename, CaptureEnvironment, ManifestInputs,
+};
+use crate::roots::{
+    canonicalize_existing, discover_default_roots, find_git_root, RootDiscoveryInputs,
 };
 use crate::snapshot::{snapshot_roots, TimestampNs};
 
@@ -73,15 +77,6 @@ pub fn run<W: Write>(cli: Cli, out: &mut W) -> std::io::Result<()> {
 }
 
 fn archive_run<W: Write>(args: &ArchiveArgs, out: &mut W) -> std::io::Result<()> {
-    // M1 enforces explicit roots; auto-discovery from the binlog lands in
-    // AR-7 / AR-8.
-    if args.roots.is_empty() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "no roots specified; pass --root <path> at least once (auto-discovery lands in M2)",
-        ));
-    }
-
     let binlog_name = args
         .binlog
         .file_name()
@@ -99,14 +94,37 @@ fn archive_run<W: Write>(args: &ArchiveArgs, out: &mut W) -> std::io::Result<()>
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| binlog_name.clone());
 
-    let tree = snapshot_roots(&args.roots, args.small_file_hash_threshold)?;
+    // Parse the binlog up front: we need the inventory for default-root
+    // discovery (D-5) regardless of whether the user passed --root.
+    let (inventory, _imports) = read_binlog(&args.binlog)?;
+
+    let roots: Vec<PathBuf> = if args.roots.is_empty() {
+        let binlog_abs = canonicalize_existing(&args.binlog);
+        let git_root = binlog_abs.parent().and_then(find_git_root);
+        let discovered = discover_default_roots(RootDiscoveryInputs {
+            binlog_path: &binlog_abs,
+            inventory: &inventory,
+            git_root: git_root.as_deref(),
+        });
+        if discovered.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "could not auto-discover any roots; pass --root <path>",
+            ));
+        }
+        discovered
+    } else {
+        args.roots.clone()
+    };
+
+    let tree = snapshot_roots(&roots, args.small_file_hash_threshold)?;
 
     let captured_at = TimestampNs::from_system_time(std::time::SystemTime::now());
     let env = CaptureEnvironment::from_process();
     let manifest = build_manifest(ManifestInputs {
         captured_at,
         env: &env,
-        roots: &args.roots,
+        roots: &roots,
         binlog_archive_name: &binlog_name,
         kind: &args.kind,
         pair_id: args.pair_id.as_deref(),
@@ -194,10 +212,18 @@ mod tests {
     }
 
     #[test]
-    fn run_archive_rejects_missing_roots_in_m1() {
-        let cli = parse(&["msbuild-diagnostic", "archive", "--binlog", "b.binlog"]);
+    fn run_archive_requires_a_real_binlog() {
+        // With AR-8 default-root discovery in place, the CLI no longer
+        // rejects empty `--root` up front — it tries to parse the binlog.
+        // A non-existent binlog path must surface as an io error.
+        let cli = parse(&[
+            "msbuild-diagnostic",
+            "archive",
+            "--binlog",
+            "does-not-exist.binlog",
+        ]);
         let mut buf = Vec::new();
-        let err = run(cli, &mut buf).expect_err("must require explicit --root in M1");
-        assert!(err.to_string().contains("--root"));
+        let err = run(cli, &mut buf).expect_err("missing binlog must error");
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
     }
 }

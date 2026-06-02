@@ -8,6 +8,7 @@ pub mod archive;
 pub mod binlog;
 pub mod cli;
 pub mod manifest;
+pub mod roots;
 pub mod sanitize;
 pub mod snapshot;
 

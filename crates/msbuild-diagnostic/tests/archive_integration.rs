@@ -12,6 +12,8 @@ use std::process::Command;
 use msbuild_diagnostic::manifest::{Manifest, MANIFEST_NAME, MANIFEST_SCHEMA_VERSION};
 use msbuild_diagnostic::snapshot::{EntryKind, TreeSnapshot, TREE_SCHEMA_VERSION};
 
+mod common;
+
 const THRESHOLD: u64 = 4096;
 const FILE_COUNT: usize = 1000;
 
@@ -51,8 +53,11 @@ fn archive_round_trip_over_synthetic_tree() {
         write_file(&path, &vec![byte; size as usize]);
     }
 
-    // Fake binlog payload — content is opaque to the archiver in M1.
-    write_file(&binlog_path, b"BINLOG-PAYLOAD-FIXTURE\n");
+    // Synthesize a valid (but content-empty) binlog so the CLI can parse
+    // it. M1 doesn't assert anything about the binlog's structural
+    // contents — only that the file ends up in the archive byte-for-byte.
+    let binlog_bytes = common::synthesize_empty_binlog();
+    write_file(&binlog_path, &binlog_bytes);
 
     let status = Command::new(bin())
         .arg("archive")
@@ -159,5 +164,5 @@ fn archive_round_trip_over_synthetic_tree() {
     let mut bin_entry = zip.by_name("build.binlog").expect("binlog present");
     let mut bin_bytes = Vec::new();
     bin_entry.read_to_end(&mut bin_bytes).expect("read binlog");
-    assert_eq!(bin_bytes, b"BINLOG-PAYLOAD-FIXTURE\n");
+    assert_eq!(bin_bytes, binlog_bytes);
 }
