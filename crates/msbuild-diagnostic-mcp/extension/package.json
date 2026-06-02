@@ -2,7 +2,7 @@
     "name": "msbuild-diagnostic-mcp",
     "displayName": "MSBuild Diagnostic MCP",
     "description": "MCP server for msbuild-diagnostic-rs, callable directly from Copilot Chat.",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "publisher": "MikeGrier",
     "license": "MIT",
     "author": {
@@ -63,7 +63,9 @@
                 },
                 "msbuild-diagnostic-mcp.extraArgs": {
                     "type": "array",
-                    "items": { "type": "string" },
+                    "items": {
+                        "type": "string"
+                    },
                     "default": [],
                     "markdownDescription": "Extra command-line arguments passed to the `msbuild-diagnostic-mcp` server on startup."
                 }
