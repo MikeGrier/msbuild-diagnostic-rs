@@ -24,3 +24,4 @@ time = { version = "0.3.47", features = ["formatting"] }
 zip = { version = "8", default-features = false, features = ["deflate-flate2"] }
 
 [dev-dependencies]
+tempfile = "3.27.0"
