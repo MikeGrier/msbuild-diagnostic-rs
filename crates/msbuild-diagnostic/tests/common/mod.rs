@@ -1,6 +1,11 @@
 // Copyright (c) 2026 Mike Grier
 //
 //! Shared helpers for integration tests.
+//!
+//! Each test binary that includes this module via `mod common;` will use a
+//! subset of the helpers. Allow dead code so adding a helper for one test
+//! does not warn from another test binary.
+#![allow(dead_code)]
 
 use std::collections::BTreeMap;
 use std::io::{Cursor, Write};

@@ -96,7 +96,7 @@ fn archive_run<W: Write>(args: &ArchiveArgs, out: &mut W) -> std::io::Result<()>
 
     // Parse the binlog up front: we need the inventory for default-root
     // discovery (D-5) regardless of whether the user passed --root.
-    let (inventory, _imports) = read_binlog(&args.binlog)?;
+    let (inventory, imports) = read_binlog(&args.binlog)?;
 
     let roots: Vec<PathBuf> = if args.roots.is_empty() {
         let binlog_abs = canonicalize_existing(&args.binlog);
@@ -141,6 +141,7 @@ fn archive_run<W: Write>(args: &ArchiveArgs, out: &mut W) -> std::io::Result<()>
             binlog_name: &binlog_name,
             tree: &tree,
             manifest: &manifest,
+            imports: &imports,
         },
         binlog_file,
         archive_file,
