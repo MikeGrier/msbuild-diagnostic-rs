@@ -23,7 +23,7 @@ dependency order. Every milestone ends with an integration test and
 - [x] **AR-9**: Extract embedded `ProjectImportArchive` entries via `BinlogReader::extract_archives` into `imports/` in the zip, preserving relative paths.
 - [x] **AR-10**: For each project dir, locate `obj/` and copy all `*.tlog` files into the zip under `tlogs/<project-relpath>/`. Files outside any project's `obj/` are not collected.
 - [x] **AR-11**: **Integration test** using `testprojects/csharp/helloworld/msbuild.binlog`. Assert: project file in the inventory, at least one `imports/` entry, `tlogs/` directory present.
-- [ ] **AR-12**: **Sanitization checkpoint (M2)** — for each new artifact (binlog records exposed via parsing, `ProjectImportArchive` payloads, `*.tlog` files), classify under D-9. Add property values and environment-variable records to a redact list; verify `*.tlog` schemas in scope are allow-listed and unknown extensions under `obj/` get dropped. Add a fixture containing a fake credential string in a binlog property; test asserts it is redacted.
+- [x] **AR-12**: **Sanitization checkpoint (M2)** — for each new artifact (binlog records exposed via parsing, `ProjectImportArchive` payloads, `*.tlog` files), classify under D-9. Add property values and environment-variable records to a redact list; verify `*.tlog` schemas in scope are allow-listed and unknown extensions under `obj/` get dropped. Add a fixture containing a fake credential string in a binlog property; test asserts it is redacted.
 
 ## Milestone 3 — Diff command
 
