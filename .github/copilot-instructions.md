@@ -382,6 +382,24 @@ At the end of every milestone, the following steps are required and must
 
 ## Checklist execution discipline
 
+**Per-item ritual — run this exact sequence after finishing each item, in
+order, before touching the next item:**
+
+1. Run the appropriate test command for the in-scope source-component.
+2. If tests fail: fix failures caused by this item. Pre-existing,
+   unrelated failures do not block the commit but **must** be recorded in
+   `UNRESOLVED-TEST-FAILURES.md` before proceeding.
+3. Check the item off in `CHECKLIST.md` (`- [ ]` → `- [x]`).
+4. If this was the **last** item in the checklist, update its entry in
+   `PLANS.md` to `completed` **in the same commit**.
+5. Commit with message: `Completed item: <item-id>: <full item text>`.
+6. `git fetch` and rebase/merge the current branch on the updated
+   upstream tip (`--no-edit`).
+7. Push **only** if at a milestone boundary or explicitly prompted.
+
+The rules below explain *why* each step exists and define the invariants
+that must hold across items.
+
 - **One item at a time.** Implement exactly one checklist item, then
   **stop and commit**, then move on. "Stop" means: do not begin reading,
   planning, or editing for the next item until the current one's commit
