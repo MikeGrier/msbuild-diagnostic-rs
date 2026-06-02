@@ -43,7 +43,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      # Pin to the same toolchain selected by `rust-toolchain.toml` so CI
+      # matches what developers run locally. Using `stable` drifts ahead
+      # of the workspace pin and can hide or surface lints/fmt changes
+      # that the pinned toolchain wouldn't.
+      - uses: dtolnay/rust-toolchain@1.95.0
       - uses: Swatinem/rust-cache@v2
       # `--locked` makes CI fail if Cargo would need to update Cargo.lock.
       # CI must build the exact dependency graph that was committed; any
@@ -69,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt
       - name: cargo fmt --check
@@ -80,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
