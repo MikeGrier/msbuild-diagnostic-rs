@@ -11,15 +11,16 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use crate::archive::{write_archive, ArchiveInputs};
+use crate::archive::{write_archive, ArchiveInputs, TREE_JSON_NAME};
 use crate::binlog::read_binlog;
+use crate::diff::diff_snapshots;
 use crate::manifest::{
     build_manifest, compose_archive_filename, CaptureEnvironment, ManifestInputs,
 };
 use crate::roots::{
     canonicalize_existing, discover_default_roots, find_git_root, RootDiscoveryInputs,
 };
-use crate::snapshot::{snapshot_roots, TimestampNs};
+use crate::snapshot::{snapshot_roots, TimestampNs, TreeSnapshot};
 use crate::tlogs::collect_tlogs;
 
 /// Default SHA-256 size threshold for `tree.json` entries, in bytes (D-4).
@@ -39,6 +40,8 @@ pub struct Cli {
 pub enum Command {
     /// Capture a snapshot archive for incremental-build diagnosis.
     Archive(ArchiveArgs),
+    /// Diff two snapshot archives' `tree.json` payloads (AR-13).
+    Diff(DiffArgs),
 }
 
 #[derive(Debug, clap::Args)]
@@ -70,10 +73,26 @@ pub struct ArchiveArgs {
     pub small_file_hash_threshold: u64,
 }
 
+/// Default name for the JSON diff report written by [`diff_run`].
+pub const DEFAULT_DIFF_REPORT_NAME: &str = "diff-report.json";
+
+#[derive(Debug, clap::Args)]
+pub struct DiffArgs {
+    /// First ("T1") snapshot archive.
+    pub t1: PathBuf,
+    /// Second ("T2") snapshot archive.
+    pub t2: PathBuf,
+    /// Path to write the JSON diff report to. Defaults to
+    /// `diff-report.json` in the current directory.
+    #[arg(long)]
+    pub out: Option<PathBuf>,
+}
+
 /// Dispatch a parsed CLI command. Writes human-readable output to `out`.
 pub fn run<W: Write>(cli: Cli, out: &mut W) -> std::io::Result<()> {
     match cli.command {
         Command::Archive(args) => archive_run(&args, out),
+        Command::Diff(args) => diff_run(&args, out),
     }
 }
 
@@ -154,6 +173,68 @@ fn archive_run<W: Write>(args: &ArchiveArgs, out: &mut W) -> std::io::Result<()>
     Ok(())
 }
 
+/// Read the `tree.json` entry from a snapshot zip and deserialize it.
+fn read_tree_from_archive(path: &std::path::Path) -> std::io::Result<TreeSnapshot> {
+    let file = std::fs::File::open(path)?;
+    let mut zip = zip::ZipArchive::new(file).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("{}: not a valid zip: {e}", path.display()),
+        )
+    })?;
+    let mut entry = zip.by_name(TREE_JSON_NAME).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("{}: missing {TREE_JSON_NAME}: {e}", path.display()),
+        )
+    })?;
+    let mut buf = String::new();
+    std::io::Read::read_to_string(&mut entry, &mut buf)?;
+    serde_json::from_str::<TreeSnapshot>(&buf).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("{}: invalid {TREE_JSON_NAME}: {e}", path.display()),
+        )
+    })
+}
+
+fn diff_run<W: Write>(args: &DiffArgs, out: &mut W) -> std::io::Result<()> {
+    let t1 = read_tree_from_archive(&args.t1)?;
+    let t2 = read_tree_from_archive(&args.t2)?;
+    let report = diff_snapshots(&t1, &t2);
+
+    let out_path = args
+        .out
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_DIFF_REPORT_NAME));
+    if let Some(parent) = out_path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    let f = std::fs::File::create(&out_path)?;
+    serde_json::to_writer_pretty(f, &report)?;
+
+    let (added, removed, changed, unchanged) =
+        report
+            .roots
+            .iter()
+            .fold((0usize, 0usize, 0usize, 0usize), |(a, r, c, u), root| {
+                (
+                    a + root.added.len(),
+                    r + root.removed.len(),
+                    c + root.changed.len(),
+                    u + root.unchanged.len(),
+                )
+            });
+    writeln!(
+        out,
+        "wrote {} (added={added}, removed={removed}, changed={changed}, unchanged={unchanged})",
+        out_path.display()
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,6 +242,13 @@ mod tests {
 
     fn parse(argv: &[&str]) -> Cli {
         Cli::try_parse_from(argv).expect("parse")
+    }
+
+    fn archive_args(cli: Cli) -> ArchiveArgs {
+        match cli.command {
+            Command::Archive(a) => a,
+            other => panic!("expected Archive, got {other:?}"),
+        }
     }
 
     #[test]
@@ -172,7 +260,7 @@ mod tests {
     #[test]
     fn archive_parses_minimal_args() {
         let cli = parse(&["msbuild-diagnostic", "archive", "--binlog", "build.binlog"]);
-        let Command::Archive(args) = cli.command;
+        let args = archive_args(cli);
         assert_eq!(args.binlog, PathBuf::from("build.binlog"));
         assert_eq!(args.kind, DEFAULT_ARCHIVE_KIND);
         assert_eq!(args.out, PathBuf::from("."));
@@ -204,7 +292,7 @@ mod tests {
             "--small-file-hash-threshold",
             "4096",
         ]);
-        let Command::Archive(args) = cli.command;
+        let args = archive_args(cli);
         assert_eq!(
             args.roots,
             vec![PathBuf::from("src"), PathBuf::from("tests")]
@@ -228,6 +316,49 @@ mod tests {
         ]);
         let mut buf = Vec::new();
         let err = run(cli, &mut buf).expect_err("missing binlog must error");
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn diff_requires_two_positional_archives() {
+        let err = Cli::try_parse_from(["msbuild-diagnostic", "diff", "only-one.zip"]).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("T2") || msg.contains("t2") || msg.contains("required"),
+            "unexpected error message: {msg}"
+        );
+    }
+
+    #[test]
+    fn diff_parses_with_optional_out() {
+        let cli = parse(&[
+            "msbuild-diagnostic",
+            "diff",
+            "t1.zip",
+            "t2.zip",
+            "--out",
+            "report.json",
+        ]);
+        match cli.command {
+            Command::Diff(a) => {
+                assert_eq!(a.t1, PathBuf::from("t1.zip"));
+                assert_eq!(a.t2, PathBuf::from("t2.zip"));
+                assert_eq!(a.out.as_deref(), Some(std::path::Path::new("report.json")));
+            }
+            other => panic!("expected Diff, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn run_diff_errors_when_archive_missing() {
+        let cli = parse(&[
+            "msbuild-diagnostic",
+            "diff",
+            "does-not-exist-t1.zip",
+            "does-not-exist-t2.zip",
+        ]);
+        let mut buf = Vec::new();
+        let err = run(cli, &mut buf).expect_err("missing archive must error");
         assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
     }
 }

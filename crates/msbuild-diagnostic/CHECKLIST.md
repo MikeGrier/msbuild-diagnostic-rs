@@ -27,7 +27,7 @@ dependency order. Every milestone ends with an integration test and
 
 ## Milestone 3 — Diff command
 
-- [ ] **AR-13**: Add `diff <T1.zip> <T2.zip>` subcommand. The diff algorithm itself is a pure function `(TreeSnapshot, TreeSnapshot) -> DiffReport` (D-12) covered by hermetic unit tests with inline / fixture JSON inputs (D-14). The subcommand only handles I/O: unzip, deserialize, call the pure function, serialize the result.
+- [x] **AR-13**: Add `diff <T1.zip> <T2.zip>` subcommand. The diff algorithm itself is a pure function `(TreeSnapshot, TreeSnapshot) -> DiffReport` (D-12) covered by hermetic unit tests with inline / fixture JSON inputs (D-14). The subcommand only handles I/O: unzip, deserialize, call the pure function, serialize the result.
 - [ ] **AR-14**: From the T2 binlog, enumerate every `TargetStarted` not preceded by `TargetSkipped`. Surface the "Building target X because Y" BuildMessage text.
 - [ ] **AR-15**: Cross-reference: for each "ran because input newer than output" message, look up both files in T1 and T2 `TreeSnapshot` values and report the actual mtime+sha256 delta. The correlator is a pure function over `(BinlogModel, TreeSnapshot, TreeSnapshot) -> CorrelationReport` (D-12), unit-tested with JSON fixtures (D-14). Output a Markdown report through the output abstraction.
 - [ ] **AR-16**: **Integration test** — build a real tiny fixture project with MSBuild to produce a real binlog, then use a `touch_with_mtime` helper (`std::fs::File::set_modified`) to drive a file's mtime to a known value, archive at T1 and T2, assert the diff identifies a touched-but-content-identical file as the cause. (Integration-tier per D-14.)
