@@ -1,8 +1,11 @@
 # Copilot Instructions
 
-Repository-agnostic operating rules for Copilot. Place repository-specific
-guidance in a separate file (e.g. `AGENTS.md`, a `COMPONENT.md`, or a
-`DESIGN-INSTRUCTIONS.md`) rather than here.
+Operating rules for Copilot in this repository. The rules below mix
+general engineering conventions the author applies across projects with
+repository-specific policies (MSBuild binlogs, mono-repo handling,
+`.scratch/` usage, etc.). Finer-grained, component-scoped rules belong
+in a separate file alongside the code they govern (e.g. `AGENTS.md`,
+`COMPONENT.md`, or `DESIGN-INSTRUCTIONS.md`).
 
 ## Interaction style
 
