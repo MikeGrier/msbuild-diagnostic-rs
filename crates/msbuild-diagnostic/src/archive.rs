@@ -14,6 +14,7 @@ use zip::CompressionMethod;
 use crate::binlog::BinlogImport;
 use crate::manifest::{Manifest, MANIFEST_NAME};
 use crate::snapshot::TreeSnapshot;
+use crate::tlogs::TlogFile;
 
 /// Canonical name for the file-tree snapshot inside the archive.
 pub const TREE_JSON_NAME: &str = "tree.json";
@@ -21,8 +22,10 @@ pub const TREE_JSON_NAME: &str = "tree.json";
 /// Canonical name for the imports subdirectory inside the archive (D-3).
 pub const IMPORTS_DIR_NAME: &str = "imports/";
 
-/// Inputs to a single archive write. Additional fields (tlogs) will land
-/// here in subsequent checklist items.
+/// Canonical name for the tlogs subdirectory inside the archive (D-3).
+pub const TLOGS_DIR_NAME: &str = "tlogs/";
+
+/// Inputs to a single archive write.
 pub struct ArchiveInputs<'a> {
     /// Name to store the binlog under inside the archive (typically the
     /// binlog's original filename).
@@ -35,6 +38,9 @@ pub struct ArchiveInputs<'a> {
     /// May be empty — the `imports/` directory is always present (D-3)
     /// even with no entries.
     pub imports: &'a [BinlogImport],
+    /// `.tlog` files collected from each project's `obj/` directory.
+    /// May be empty — the `tlogs/` directory is always present (D-3).
+    pub tlogs: &'a [TlogFile],
 }
 
 /// Write the archive to `out`. `out` must be seekable (the central
@@ -67,6 +73,30 @@ pub fn write_archive<W: Write + Seek, R: Read>(
         let entry_name = format!("{IMPORTS_DIR_NAME}{safe}");
         zw.start_file(&entry_name, file_opts).map_err(zip_to_io)?;
         zw.write_all(import.contents.as_bytes())?;
+    }
+
+    zw.add_directory(TLOGS_DIR_NAME, dir_opts)
+        .map_err(zip_to_io)?;
+    for tlog in inputs.tlogs {
+        let rel = tlog
+            .archive_relpath
+            .to_str()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("non-utf8 tlog path: {:?}", tlog.archive_relpath),
+                )
+            })?
+            .replace('\\', "/");
+        let safe = sanitize_import_path(&rel).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("unsafe tlog path: {rel}"),
+            )
+        })?;
+        let entry_name = format!("{TLOGS_DIR_NAME}{safe}");
+        zw.start_file(&entry_name, file_opts).map_err(zip_to_io)?;
+        zw.write_all(&tlog.contents)?;
     }
 
     zw.start_file(inputs.binlog_name, file_opts)
@@ -167,6 +197,14 @@ mod tests {
     }
 
     fn build_with_imports(binlog_bytes: &[u8], imports: &[BinlogImport]) -> Vec<u8> {
+        build_full(binlog_bytes, imports, &[])
+    }
+
+    fn build_full(
+        binlog_bytes: &[u8],
+        imports: &[BinlogImport],
+        tlogs: &[crate::tlogs::TlogFile],
+    ) -> Vec<u8> {
         let tree = sample_tree();
         let manifest = sample_manifest();
         let inputs = ArchiveInputs {
@@ -174,6 +212,7 @@ mod tests {
             tree: &tree,
             manifest: &manifest,
             imports,
+            tlogs,
         };
         let mut buf = Cursor::new(Vec::<u8>::new());
         write_archive(&inputs, Cursor::new(binlog_bytes), &mut buf).expect("write");
@@ -297,6 +336,7 @@ mod tests {
             tree: &tree,
             manifest: &manifest,
             imports: &imports,
+            tlogs: &[],
         };
         let mut buf = Cursor::new(Vec::<u8>::new());
         let err = write_archive(&inputs, Cursor::new(b"x".as_slice()), &mut buf)
@@ -317,10 +357,49 @@ mod tests {
             tree: &tree,
             manifest: &manifest,
             imports: &imports,
+            tlogs: &[],
         };
         let mut buf = Cursor::new(Vec::<u8>::new());
         let err = write_archive(&inputs, Cursor::new(b"x".as_slice()), &mut buf)
             .expect_err("`..` segments must be rejected");
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn tlogs_directory_is_always_present() {
+        let zip_bytes = build(b"x");
+        let archive = open(zip_bytes);
+        assert!(archive.file_names().any(|n| n == TLOGS_DIR_NAME));
+    }
+
+    #[test]
+    fn tlogs_are_written_under_tlogs_prefix_with_raw_bytes() {
+        let tlogs = vec![
+            crate::tlogs::TlogFile {
+                archive_relpath: std::path::PathBuf::from("Hello/CL.read.1.tlog"),
+                contents: vec![0xFF, 0xFE, b'a', 0, b'b', 0],
+            },
+            crate::tlogs::TlogFile {
+                archive_relpath: std::path::PathBuf::from("Hello/sub/Link.write.1.tlog"),
+                contents: b"linked".to_vec(),
+            },
+        ];
+        let zip_bytes = build_full(b"x", &[], &tlogs);
+        let mut archive = open(zip_bytes);
+
+        let mut a = archive
+            .by_name("tlogs/Hello/CL.read.1.tlog")
+            .expect("first tlog");
+        let mut got = Vec::new();
+        a.read_to_end(&mut got).unwrap();
+        assert_eq!(got, vec![0xFF, 0xFE, b'a', 0, b'b', 0]);
+        drop(a);
+
+        let mut b = archive
+            .by_name("tlogs/Hello/sub/Link.write.1.tlog")
+            .expect("nested tlog");
+        let mut got = Vec::new();
+        b.read_to_end(&mut got).unwrap();
+        assert_eq!(got, b"linked");
     }
 }

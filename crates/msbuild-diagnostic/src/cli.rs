@@ -20,6 +20,7 @@ use crate::roots::{
     canonicalize_existing, discover_default_roots, find_git_root, RootDiscoveryInputs,
 };
 use crate::snapshot::{snapshot_roots, TimestampNs};
+use crate::tlogs::collect_tlogs;
 
 /// Default SHA-256 size threshold for `tree.json` entries, in bytes (D-4).
 pub const DEFAULT_SMALL_FILE_HASH_THRESHOLD: u64 = 1_048_576;
@@ -118,6 +119,7 @@ fn archive_run<W: Write>(args: &ArchiveArgs, out: &mut W) -> std::io::Result<()>
     };
 
     let tree = snapshot_roots(&roots, args.small_file_hash_threshold)?;
+    let tlogs = collect_tlogs(&inventory)?;
 
     let captured_at = TimestampNs::from_system_time(std::time::SystemTime::now());
     let env = CaptureEnvironment::from_process();
@@ -142,6 +144,7 @@ fn archive_run<W: Write>(args: &ArchiveArgs, out: &mut W) -> std::io::Result<()>
             tree: &tree,
             manifest: &manifest,
             imports: &imports,
+            tlogs: &tlogs,
         },
         binlog_file,
         archive_file,
