@@ -47,7 +47,7 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       pr: ${{ steps.release.outputs.pr }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         id: release
         with:
           # IMPORTANT: must be a PAT (personal access token) with `repo`
