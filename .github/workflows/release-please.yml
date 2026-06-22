@@ -71,7 +71,7 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.pr != '' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
           # Use the same PAT so the committed Cargo.lock push is associated
