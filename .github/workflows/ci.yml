@@ -33,7 +33,7 @@ jobs:
     name: encoding sanity check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Run check-encoding.ps1
         shell: pwsh
         run: ./tools/check-encoding.ps1
@@ -42,7 +42,7 @@ jobs:
     name: build + test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Pin to the same toolchain selected by `rust-toolchain.toml` so CI
       # matches what developers run locally. Using `stable` drifts ahead
       # of the workspace pin and can hide or surface lints/fmt changes
@@ -72,7 +72,7 @@ jobs:
     name: rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt
@@ -83,7 +83,7 @@ jobs:
     name: clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: clippy
@@ -95,7 +95,7 @@ jobs:
     name: MSRV check (1.93)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # Pin to the exact MSRV declared in [workspace.package].rust-version
       # so a stray use of a newer-stable feature fails CI rather than
       # silently raising the floor for downstream consumers.
